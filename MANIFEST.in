@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include model *.py
+recursive-include verifier *.py
+recursive-include backend *.py
+recursive-include dataset *.py
+recursive-include benchmark *.py
+recursive-exclude dataset/generated *
+prune dataset/generated

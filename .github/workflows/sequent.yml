@@ -1,0 +1,45 @@
+name: Sequent Verification
+
+on:
+  pull_request:
+    paths:
+      - '**.py'
+  push:
+    branches: [main]
+    paths:
+      - '**.py'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Sequent
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch-geometric z3-solver
+          pip install -r requirements.txt
+
+      - name: Run Sequent verification
+        run: |
+          echo "Running Sequent on changed Python files..."
+          EXIT_CODE=0
+          for file in $(git diff --name-only --diff-filter=ACMR HEAD~1 -- '*.py'); do
+            echo "Checking $file..."
+            python cli.py check "$file" --cert "sequent-cert-$(basename $file .py).json" || EXIT_CODE=1
+          done
+          exit $EXIT_CODE
+
+      - name: Upload proof certificates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sequent-certificates
+          path: sequent-cert-*.json
+          if-no-files-found: ignore
