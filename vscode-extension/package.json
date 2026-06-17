@@ -1,0 +1,97 @@
+{
+  "name": "sequent-verify",
+  "displayName": "Sequent - Neural Formal Verification",
+  "description": "GNN proposes, Z3 disposes. Neurosymbolic Python verification.",
+  "version": "0.1.0",
+  "publisher": "devangpratap",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "python",
+    "verification",
+    "formal methods",
+    "z3",
+    "gnn",
+    "bug detection"
+  ],
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sequent.verifyFile",
+        "title": "Sequent: Verify Current File",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "sequent.verifyFunction",
+        "title": "Sequent: Verify Function at Cursor"
+      },
+      {
+        "command": "sequent.autoRepair",
+        "title": "Sequent: Apply Auto-Repair Suggestion"
+      }
+    ],
+    "configuration": {
+      "title": "Sequent",
+      "properties": {
+        "sequent.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to the Python interpreter used to run Sequent."
+        },
+        "sequent.autoVerify": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run verification on save."
+        },
+        "sequent.severity": {
+          "type": "string",
+          "default": "Error",
+          "enum": [
+            "Error",
+            "Warning",
+            "Information",
+            "Hint"
+          ],
+          "description": "Diagnostic severity level for detected bugs."
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "sequent.verifyFile",
+          "when": "resourceLangId == python",
+          "group": "sequent"
+        },
+        {
+          "command": "sequent.verifyFunction",
+          "when": "resourceLangId == python",
+          "group": "sequent"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

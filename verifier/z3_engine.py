@@ -23,6 +23,8 @@ from typing import Optional
 
 import z3
 
+from verifier.symbolic_executor import ExecStatus, SymbolicExecutor
+
 
 class VerificationResult(Enum):
     VERIFIED = "verified"        # Property holds -- proven correct
@@ -107,6 +109,7 @@ class Z3Verifier:
             self._check_dead_code,
             self._check_operator_consistency,
             self._check_recursion_base_case,
+            self._check_symbolic_properties,
         ]
 
         for checker in checkers:
@@ -117,14 +120,17 @@ class Z3Verifier:
                 pass  # Skip failed checkers
 
         # Determine overall result
+        # Informational checks (sym_overflow) do not block VERIFIED.
+        _info_checks = {"sym_overflow"}
+        decisive = [c for c in report.checks if c.property_name not in _info_checks]
         if report.has_bugs:
             report.overall_result = VerificationResult.COUNTEREXAMPLE
-        elif all(c.result == VerificationResult.VERIFIED for c in report.checks):
+        elif all(c.result == VerificationResult.VERIFIED for c in decisive):
             report.overall_result = VerificationResult.VERIFIED
-        elif any(c.result == VerificationResult.UNKNOWN for c in report.checks):
+        elif any(c.result == VerificationResult.UNKNOWN for c in decisive):
             report.overall_result = VerificationResult.UNKNOWN
         else:
-            report.overall_result = VerificationResult.VERIFIED if report.checks else VerificationResult.UNKNOWN
+            report.overall_result = VerificationResult.VERIFIED if decisive else VerificationResult.UNKNOWN
 
         report.total_time_ms = (time.time() - t0) * 1000
         return report
@@ -1238,6 +1244,196 @@ class Z3Verifier:
         solver.pop()
 
         return None
+
+    # ------------------------------------------------------------------
+    # Symbolic Execution Property Checker
+    # ------------------------------------------------------------------
+
+    def _check_symbolic_properties(self, func_def: ast.FunctionDef, code: str) -> list[PropertyCheck]:
+        """Run SymbolicExecutor on *func_def* and verify properties against the symbolic state."""
+        checks: list[PropertyCheck] = []
+        t0 = time.time()
+
+        try:
+            executor = SymbolicExecutor(max_loop_unroll=5)
+            sym_state = executor.execute(func_def)
+        except Exception:
+            return checks  # graceful fallback
+
+        if sym_state.status == ExecStatus.UNSUPPORTED:
+            checks.append(PropertyCheck(
+                property_name="symbolic_exec",
+                result=VerificationResult.UNSUPPORTED,
+                description="Symbolic execution encountered unsupported constructs: "
+                            + "; ".join(sym_state.assumptions[:3]),
+                time_ms=(time.time() - t0) * 1000,
+            ))
+            # Still try to check whatever we collected
+            if not sym_state.divisions and not sym_state.array_accesses:
+                return checks
+
+        # --- Division by zero ---
+        for divisor_expr, line in sym_state.divisions:
+            try:
+                solver = z3.Solver()
+                solver.set("timeout", self.timeout_ms)
+                # Add path constraints
+                for pc in sym_state.path_constraints:
+                    solver.add(pc)
+                # Check: can divisor == 0?
+                solver.add(divisor_expr == 0)
+                result = solver.check()
+                if result == z3.sat:
+                    model = solver.model()
+                    ce = {}
+                    for d in model.decls():
+                        ce[d.name()] = str(model[d])
+                    checks.append(PropertyCheck(
+                        property_name="sym_division_by_zero",
+                        result=VerificationResult.COUNTEREXAMPLE,
+                        description=f"Division by zero possible at line {line}",
+                        line=line,
+                        counterexample=ce,
+                        time_ms=(time.time() - t0) * 1000,
+                    ))
+                elif result == z3.unsat:
+                    checks.append(PropertyCheck(
+                        property_name="sym_division_by_zero",
+                        result=VerificationResult.VERIFIED,
+                        description=f"Division at line {line} safe from zero divisor",
+                        line=line,
+                        time_ms=(time.time() - t0) * 1000,
+                    ))
+            except Exception:
+                pass
+
+        # --- Array bounds ---
+        for arr_name, index_expr, line in sym_state.array_accesses:
+            try:
+                len_var_name = f"len_{arr_name}"
+                if len_var_name in sym_state.variables:
+                    arr_len = sym_state.variables[len_var_name]
+                else:
+                    arr_len = z3.Int(len_var_name)
+
+                solver = z3.Solver()
+                solver.set("timeout", self.timeout_ms)
+                for pc in sym_state.path_constraints:
+                    solver.add(pc)
+                solver.add(arr_len >= 0)
+
+                # Check: can index < 0 OR index >= len?
+                solver.push()
+                solver.add(z3.Or(index_expr < 0, index_expr >= arr_len))
+                result = solver.check()
+                solver.pop()
+
+                if result == z3.sat:
+                    model = solver.model()
+                    ce = {}
+                    for d in model.decls():
+                        ce[d.name()] = str(model[d])
+                    checks.append(PropertyCheck(
+                        property_name="sym_array_bounds",
+                        result=VerificationResult.COUNTEREXAMPLE,
+                        description=f"Array '{arr_name}' access at line {line} can be out of bounds",
+                        line=line,
+                        counterexample=ce,
+                        time_ms=(time.time() - t0) * 1000,
+                    ))
+                elif result == z3.unsat:
+                    checks.append(PropertyCheck(
+                        property_name="sym_array_bounds",
+                        result=VerificationResult.VERIFIED,
+                        description=f"Array '{arr_name}' access at line {line} is within bounds",
+                        line=line,
+                        time_ms=(time.time() - t0) * 1000,
+                    ))
+            except Exception:
+                pass
+
+        # --- Overflow check (result > 2^31-1 or < -2^31) ---
+        # Constrain inputs to 32-bit range so we only detect overflow from
+        # *computation*, not from unconstrained symbolic parameters.
+        if sym_state.return_expr is not None:
+            try:
+                solver = z3.Solver()
+                solver.set("timeout", self.timeout_ms)
+                for pc in sym_state.path_constraints:
+                    solver.add(pc)
+                int32_max = z3.IntVal(2**31 - 1)
+                int32_min = z3.IntVal(-(2**31))
+                # Bound each function parameter to 32-bit range
+                for arg in func_def.args.args:
+                    p = z3.Int(arg.arg)
+                    solver.add(p >= int32_min, p <= int32_max)
+                ret = sym_state.return_expr
+                solver.add(z3.Or(ret > int32_max, ret < int32_min))
+                result = solver.check()
+                if result == z3.sat:
+                    model = solver.model()
+                    ce = {}
+                    for d in model.decls():
+                        ce[d.name()] = str(model[d])
+                    checks.append(PropertyCheck(
+                        property_name="sym_overflow",
+                        result=VerificationResult.UNKNOWN,
+                        description="Return value may overflow 32-bit integer range (warning)",
+                        counterexample=ce,
+                        time_ms=(time.time() - t0) * 1000,
+                    ))
+                elif result == z3.unsat:
+                    checks.append(PropertyCheck(
+                        property_name="sym_overflow",
+                        result=VerificationResult.VERIFIED,
+                        description="Return value stays within 32-bit integer range",
+                        time_ms=(time.time() - t0) * 1000,
+                    ))
+            except Exception:
+                pass
+
+        # --- None return check ---
+        # Only flag if the function never explicitly returns None (i.e. None
+        # return is accidental, not part of the contract).
+        if sym_state.return_expr is not None:
+            try:
+                # Skip if function intentionally returns None somewhere
+                explicitly_returns_none = False
+                for n in ast.walk(func_def):
+                    if isinstance(n, ast.Return):
+                        if n.value is None:
+                            explicitly_returns_none = True
+                        elif isinstance(n.value, ast.Constant) and n.value.value is None:
+                            explicitly_returns_none = True
+
+                has_value_return = any(
+                    isinstance(n, ast.Return) and n.value is not None
+                    for n in ast.walk(func_def)
+                )
+
+                if has_value_return and not explicitly_returns_none:
+                    solver = z3.Solver()
+                    solver.set("timeout", self.timeout_ms)
+                    for pc in sym_state.path_constraints:
+                        solver.add(pc)
+                    solver.add(sym_state.return_expr == z3.IntVal(-999999))
+                    result = solver.check()
+                    if result == z3.sat:
+                        model = solver.model()
+                        ce = {}
+                        for d in model.decls():
+                            ce[d.name()] = str(model[d])
+                        checks.append(PropertyCheck(
+                            property_name="sym_none_return",
+                            result=VerificationResult.COUNTEREXAMPLE,
+                            description="Function can return None on some paths",
+                            counterexample=ce,
+                            time_ms=(time.time() - t0) * 1000,
+                        ))
+            except Exception:
+                pass
+
+        return checks
 
     def _all_branches_return(self, if_node) -> bool:
         """Check if all branches of an if/else tree return a value."""
