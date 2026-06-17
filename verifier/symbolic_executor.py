@@ -60,8 +60,24 @@ class SymbolicExecutor:
     # Public entry point
     # ------------------------------------------------------------------
 
-    def execute(self, func_def: ast.FunctionDef) -> SymbolicState:
-        """Symbolically execute *func_def* and return the resulting state."""
+    def execute(self, func_def) -> SymbolicState:
+        """Symbolically execute a function and return the resulting state.
+
+        Args:
+            func_def: an ast.FunctionDef node, or a string of Python source code.
+        """
+        if isinstance(func_def, str):
+            tree = ast.parse(func_def)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    func_def = node
+                    break
+            else:
+                state = SymbolicState()
+                state.status = ExecStatus.UNSUPPORTED
+                state.assumptions.append("No function definition found in source")
+                return state
+
         state = SymbolicState()
 
         # Create symbolic variables for each parameter
