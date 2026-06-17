@@ -20,7 +20,17 @@ export default function Layout() {
         <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
             <NavLink to="/" style={{ textDecoration: 'none', textShadow: 'none' }}>
-              <pre style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.55rem', lineHeight: 1.1, color: 'var(--accent-4)', margin: 0, letterSpacing: '0.02em' }}>{'┌─┐┌─┐┌─┐ ┬ ┬┌─┐┌┐┌┌┬┐\n└─┐├┤ │─┼┐│ │├┤ │││ │ \n└─┘└─┘└─┘└└─┘└─┘┘└┘ ┴ '}</pre>
+              <span style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                background: 'linear-gradient(90deg, var(--accent-4), var(--accent-5))',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}>
+                sequent
+              </span>
             </NavLink>
             <nav style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               {NAV_ITEMS.map(item => (
@@ -52,7 +62,11 @@ export default function Layout() {
 
       <footer style={{ borderTop: '1px solid var(--border)', padding: '0.75rem 1.5rem', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '72rem', margin: '0 auto', textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>
-          sequent · MIT · neurosymbolic verification · built by devang
+          sequent {'  \u00B7  '} MIT {'  \u00B7  '}
+          <a href="https://github.com/devangpratapsingh/sequent" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textShadow: 'none' }}>github</a>
+          {'  \u00B7  '}
+          <NavLink to="/docs" style={{ color: 'var(--text-muted)', textShadow: 'none' }}>docs</NavLink>
+          {'  \u00B7  '} built by devang
         </div>
       </footer>
     </div>

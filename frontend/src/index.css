@@ -35,17 +35,44 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: 0.06;
+  opacity: 0.04;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
 }
 
-/* Canvas background is handled in JS — no CSS needed */
+/* ======================================
+   DRIFTING PROOF SYMBOLS — BACKGROUND
+   ====================================== */
 
-/* ══════════════════════════════════════════
+.drifting-symbols {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.drift-symbol {
+  position: absolute;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  animation: drift-up linear infinite;
+  will-change: transform;
+}
+
+@keyframes drift-up {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-100vh);
+  }
+}
+
+/* ======================================
    LINE NUMBERS — LEFT MARGIN
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .line-numbers {
   position: absolute;
@@ -55,17 +82,17 @@ body::after {
   font-size: 11px;
   line-height: 20px;
   text-align: right;
-  color: #c4653a;
-  opacity: 0.18;
+  color: var(--text-muted);
+  opacity: 0.08;
   pointer-events: none;
   z-index: 0;
   font-family: 'JetBrains Mono', monospace;
   user-select: none;
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    VIM STATUSLINE — BOTTOM
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .vim-statusline {
   position: fixed;
@@ -76,16 +103,16 @@ body::after {
   font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
   color: var(--text-muted);
-  opacity: 0.12;
+  opacity: 0.15;
   background: var(--bg-surface);
   border-top: 1px solid var(--border);
   pointer-events: none;
   z-index: 50;
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    LANDING LAYOUT
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .landing-container {
   position: relative;
@@ -107,44 +134,31 @@ body::after {
   overflow: hidden;
 }
 
-.section-heading {
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.section-heading {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: 0.02em;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
-  display: inline-block;
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
-  text-shadow: 0 0 5px rgba(196, 101, 58, 0.35), 0 0 14px rgba(196, 101, 58, 0.15);
-}
-
-/* ══════════════════════════════════════════
+/* ======================================
    HERO
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .hero {
   text-align: center;
-  margin-bottom: 2rem;
-  padding-top: 0.5rem;
+  margin-bottom: 4rem;
+  padding-top: 2rem;
 }
 
 .hero-ascii {
   display: inline-block;
   text-align: left;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   line-height: 1.25;
   margin-bottom: 0.75rem;
-  color: var(--accent-4);
   font-family: 'JetBrains Mono', monospace;
   animation: logo-fade-in 0.8s ease-out;
+}
+
+.hero-logo-gradient {
+  background: linear-gradient(90deg, var(--accent-4), var(--accent-5));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .hero-subtitle {
@@ -212,45 +226,46 @@ body::after {
   flex-wrap: wrap;
 }
 
-/* ══════════════════════════════════════════
-   BUTTONS
-   ══════════════════════════════════════════ */
+/* ======================================
+   BUTTONS — square corners, bracket aesthetic
+   ====================================== */
 
 .btn {
   padding: 0.5rem 1rem;
   font-size: 0.75rem;
-  border: 1px solid rgba(196, 101, 58, 0.4);
-  color: #c4653a;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   background: transparent;
   cursor: pointer;
   font-family: 'JetBrains Mono', monospace;
   text-decoration: none;
   transition: all 0.15s;
-  text-shadow: 0 0 8px rgba(196, 101, 58, 0.6);
+  border-radius: 0;
 }
 
 .btn:hover {
-  background: rgba(196, 101, 58, 0.08);
-  color: #d4845a;
-  border-color: #c4653a;
+  background: var(--bg-elevated);
+  color: var(--accent-1);
+  border-color: var(--accent-1);
   text-decoration: none;
-  text-shadow: 0 0 10px rgba(196, 101, 58, 0.7);
+  text-shadow: 0 0 8px var(--accent-1);
 }
 
 .btn-primary {
-  border-color: rgba(196, 101, 58, 0.5);
-  color: #c4653a;
+  border-color: var(--accent-4);
+  color: var(--accent-4);
 }
 
 .btn-primary:hover {
-  background: rgba(196, 101, 58, 0.08);
-  color: #d4845a;
-  border-color: #c4653a;
+  background: rgba(187, 154, 247, 0.08);
+  color: var(--accent-4);
+  border-color: var(--accent-4);
+  text-shadow: 0 0 8px var(--accent-4);
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    TERMINAL DEMO
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .terminal-window {
   border: 1px solid var(--border);
@@ -313,9 +328,9 @@ body::after {
   }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    FEATURES
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .features-list {
   display: flex;
@@ -331,11 +346,11 @@ body::after {
   font-size: 0.875rem;
   color: var(--text-primary);
   transition: color 0.15s, text-shadow 0.15s;
-  text-shadow: 0 0 5px rgba(196, 101, 58, 0.3);
 }
 
 .feature-item:hover .feature-name {
   color: var(--accent-1);
+  text-shadow: 0 0 8px var(--accent-1);
 }
 
 .feature-desc {
@@ -347,9 +362,9 @@ body::after {
   line-height: 1.6;
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    CODE SPLIT PANELS
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .code-split {
   display: grid;
@@ -384,14 +399,25 @@ body::after {
   background: var(--bg-surface);
   margin: 0;
   white-space: pre;
+  align-self: start;
 }
+
+/* Fake syntax highlighting classes */
+.syn-keyword { color: var(--accent-4); }
+.syn-function { color: var(--accent-1); }
+.syn-param { color: var(--accent-3); }
+.syn-type { color: var(--accent-5); }
+.syn-pass { color: var(--accent-2); font-weight: 700; }
+.syn-label { color: var(--text-muted); }
+.syn-verified { color: var(--accent-2); font-weight: 700; }
+.syn-symbolic { color: var(--accent-5); }
 
 .code-python {
   color: var(--text-primary);
 }
 
 .code-output {
-  color: var(--accent-2);
+  color: var(--text-primary);
 }
 
 @media (max-width: 640px) {
@@ -404,9 +430,9 @@ body::after {
   }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    QUICKSTART
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .quickstart-block {
   background: var(--bg-surface);
@@ -414,6 +440,7 @@ body::after {
   padding: 1rem;
   font-size: 0.825rem;
   line-height: 1.8;
+  position: relative;
 }
 
 .quickstart-block .prompt {
@@ -425,9 +452,33 @@ body::after {
   color: var(--text-muted);
 }
 
-/* ══════════════════════════════════════════
+.quickstart-copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.quickstart-block:hover .quickstart-copy-btn {
+  opacity: 1;
+}
+
+.quickstart-copy-btn:hover {
+  color: var(--accent-1);
+  border-color: var(--accent-1);
+}
+
+/* ======================================
    ARCHITECTURE GRID
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .arch-grid {
   display: grid;
@@ -452,7 +503,6 @@ body::after {
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  text-shadow: 0 0 5px rgba(196, 101, 58, 0.35), 0 0 14px rgba(196, 101, 58, 0.15);
 }
 
 .arch-desc {
@@ -467,9 +517,9 @@ body::after {
   }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    CURSOR BLINK
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .cursor-blink::after {
   content: '\2588';
@@ -483,9 +533,9 @@ body::after {
   50% { opacity: 0; }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    LOGO FADE IN
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 @keyframes logo-fade-in {
   from {
@@ -498,9 +548,9 @@ body::after {
   }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    GENERAL ANIMATIONS
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(12px); }
@@ -520,27 +570,28 @@ body::after {
   animation: fade-in 0.4s ease-out forwards;
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    REDUCED MOTION
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 @media (prefers-reduced-motion: reduce) {
   .terminal-line,
-  .hero-logo-block,
-  .cursor-blink::after {
+  .hero-ascii,
+  .cursor-blink::after,
+  .drift-symbol {
     animation: none !important;
   }
-  canvas {
+  .drifting-symbols {
     display: none;
   }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    MOBILE — HIDE DECOR
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 @media (max-width: 768px) {
-  canvas {
+  .drifting-symbols {
     display: none;
   }
   .line-numbers {
@@ -560,9 +611,9 @@ body::after {
   }
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    CODEMIRROR (playground)
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 .cm-editor {
   background: var(--bg-deep) !important;
@@ -593,9 +644,9 @@ body::after {
   background: rgba(122, 162, 247, 0.04) !important;
 }
 
-/* ══════════════════════════════════════════
+/* ======================================
    SCROLLBAR
-   ══════════════════════════════════════════ */
+   ====================================== */
 
 ::-webkit-scrollbar {
   width: 5px;
@@ -614,6 +665,10 @@ body::after {
   background: rgba(187, 154, 247, 0.2);
 }
 
+/* ======================================
+   LINKS
+   ====================================== */
+
 a {
   color: var(--accent-1);
   text-decoration: none;
@@ -625,12 +680,15 @@ a:hover {
   text-shadow: 0 0 8px var(--accent-1);
 }
 
+/* ======================================
+   NAV BUTTONS
+   ====================================== */
+
 .nav-btn {
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   text-decoration: none;
-  text-shadow: 0 0 5px rgba(196, 101, 58, 0.3);
-  color: #c4653a;
+  color: var(--text-muted);
   border: 1px solid transparent;
   background: transparent;
   transition: all 0.15s;
@@ -638,12 +696,13 @@ a:hover {
 }
 
 .nav-btn:hover {
-  text-shadow: 0 0 10px rgba(196, 101, 58, 0.7), 0 0 20px rgba(196, 101, 58, 0.3);
-  color: #d4845a;
+  color: var(--accent-1);
+  text-shadow: 0 0 8px var(--accent-1);
   text-decoration: none;
 }
 
 .nav-btn.active {
-  border: 1px solid rgba(196, 101, 58, 0.3);
-  background: rgba(196, 101, 58, 0.08);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--accent-1);
 }

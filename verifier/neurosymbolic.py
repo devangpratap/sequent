@@ -167,12 +167,22 @@ class SequentEngine:
                 "BUG FOUND by Z3 (GNN missed it). Formal counterexample proves the bug exists."
             )
         elif gnn_says_buggy and not z3_says_buggy:
-            result.consensus_buggy = False
-            result.consensus_description = (
-                f"GNN flagged potential bug (confidence: "
-                f"{result.gnn_prediction.buggy_confidence:.1%}) but Z3 could not confirm. "
-                f"Likely false positive or bug class outside Z3's scope."
-            )
+            gnn_conf = result.gnn_prediction.buggy_confidence
+            if gnn_conf > 0.85:
+                # High-confidence GNN prediction — Z3 may lack coverage for this bug class
+                result.consensus_buggy = False
+                result.consensus_description = (
+                    f"WARNING: GNN flagged bug with high confidence ({gnn_conf:.1%}) "
+                    f"but Z3 could not confirm. Bug class may be outside Z3's scope. "
+                    f"Lines: {result.gnn_prediction.bug_lines}"
+                )
+            else:
+                result.consensus_buggy = False
+                result.consensus_description = (
+                    f"GNN flagged potential bug (confidence: {gnn_conf:.1%}) "
+                    f"but Z3 could not confirm. "
+                    f"Likely false positive or bug class outside Z3's scope."
+                )
         else:
             result.consensus_buggy = False
             result.consensus_description = "VERIFIED: Both GNN and Z3 agree — no bugs detected."
@@ -275,6 +285,21 @@ class SequentEngine:
                 return self._repair_overflow(code, check)
             elif check.property_name == "range_bound_check":
                 return self._repair_off_by_one(code, check)
+            elif check.property_name == "return_completeness":
+                return self._repair_missing_return(code, check)
+            elif check.property_name == "operator_consistency":
+                return self._repair_wrong_operator(code, check)
+            elif check.property_name == "recursion_base_case":
+                return self._repair_recursion_base_case(code, check)
+            elif check.property_name == "loop_termination":
+                return RepairResult(
+                    original_code=code,
+                    repaired_code=code,
+                    repair_description="Potential infinite loop detected — manual review recommended",
+                    repair_line=check.line or 0,
+                )
+            elif check.property_name == "index_bounds":
+                return self._repair_index_bounds(code, check)
 
         return None
 
@@ -391,6 +416,249 @@ class SequentEngine:
             pass
 
         return None
+
+    def _repair_missing_return(self, code: str, check) -> Optional[RepairResult]:
+        """When return completeness fails, add a default return at the end of the function.
+
+        Uses AST inspection to infer the likely return type from existing return
+        statements, then appends an appropriate default return.
+        """
+        try:
+            tree = ast.parse(code)
+            func_def = None
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    func_def = node
+                    break
+
+            if not func_def:
+                return None
+
+            # Collect return values from existing return statements to infer type
+            return_values = []
+            for node in ast.walk(func_def):
+                if isinstance(node, ast.Return) and node.value is not None:
+                    return_values.append(node.value)
+
+            # Determine the default return value based on existing returns
+            default_return = "None"
+            if return_values:
+                sample = return_values[0]
+                if isinstance(sample, ast.Constant):
+                    if isinstance(sample.value, bool):
+                        default_return = "False"
+                    elif isinstance(sample.value, int):
+                        default_return = "0"
+                    elif isinstance(sample.value, float):
+                        default_return = "0.0"
+                    elif isinstance(sample.value, str):
+                        default_return = "''"
+                elif isinstance(sample, ast.List):
+                    default_return = "[]"
+                elif isinstance(sample, ast.Dict):
+                    default_return = "{}"
+                elif isinstance(sample, ast.Tuple):
+                    default_return = "()"
+
+            # Add default return at the end of the function body
+            default_stmt = ast.parse(f"return {default_return}").body[0]
+            ast.fix_missing_locations(default_stmt)
+            func_def.body.append(default_stmt)
+            ast.fix_missing_locations(tree)
+            repaired = ast.unparse(tree)
+
+            return RepairResult(
+                original_code=code,
+                repaired_code=repaired,
+                repair_description=f"Added default 'return {default_return}' for missing return path",
+                repair_line=func_def.end_lineno or func_def.lineno,
+            )
+        except Exception:
+            return None
+
+    def _repair_wrong_operator(self, code: str, check) -> Optional[RepairResult]:
+        """For operator consistency issues, swap the flagged operator.
+
+        Supports swapping < to <=, > to >=, 'and' to 'or', and vice versa,
+        based on the suggestion in the counterexample.
+        """
+        try:
+            tree = ast.parse(code)
+            target_line = check.line
+
+            if not target_line:
+                return None
+
+            swap_map = {
+                ast.Lt: ast.LtE,
+                ast.LtE: ast.Lt,
+                ast.Gt: ast.GtE,
+                ast.GtE: ast.Gt,
+                ast.And: ast.Or,
+                ast.Or: ast.And,
+            }
+
+            class OperatorFixer(ast.NodeTransformer):
+                def __init__(self):
+                    self.fixed = False
+
+                def visit_Compare(self, node):
+                    self.generic_visit(node)
+                    if self.fixed:
+                        return node
+                    if hasattr(node, 'lineno') and node.lineno == target_line:
+                        new_ops = []
+                        changed = False
+                        for op in node.ops:
+                            replacement = swap_map.get(type(op))
+                            if replacement is not None:
+                                new_ops.append(replacement())
+                                changed = True
+                            else:
+                                new_ops.append(op)
+                        if changed:
+                            node.ops = new_ops
+                            self.fixed = True
+                    return node
+
+                def visit_BoolOp(self, node):
+                    self.generic_visit(node)
+                    if self.fixed:
+                        return node
+                    if hasattr(node, 'lineno') and node.lineno == target_line:
+                        replacement = swap_map.get(type(node.op))
+                        if replacement is not None:
+                            node.op = replacement()
+                            self.fixed = True
+                    return node
+
+            fixer = OperatorFixer()
+            fixed_tree = fixer.visit(tree)
+            if fixer.fixed:
+                ast.fix_missing_locations(fixed_tree)
+                repaired = ast.unparse(fixed_tree)
+                return RepairResult(
+                    original_code=code,
+                    repaired_code=repaired,
+                    repair_description=f"Swapped operator at line {target_line} for consistency",
+                    repair_line=target_line,
+                )
+        except Exception:
+            return None
+
+        return None
+
+    def _repair_recursion_base_case(self, code: str, check) -> Optional[RepairResult]:
+        """For missing recursion base case, add a guard based on parameter names.
+
+        Inserts a base-case check like ``if n <= 0: return`` at the top of the
+        recursive function, choosing the parameter and sentinel from conventions.
+        """
+        try:
+            tree = ast.parse(code)
+            func_def = None
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    func_def = node
+                    break
+
+            if not func_def:
+                return None
+
+            params = [arg.arg for arg in func_def.args.args]
+            if not params:
+                return None
+
+            # Pick the most likely recursion-control parameter
+            preferred = ['n', 'depth', 'count', 'k', 'num', 'level', 'size']
+            chosen_param = None
+            for name in preferred:
+                if name in params:
+                    chosen_param = name
+                    break
+            if chosen_param is None:
+                chosen_param = params[0]
+
+            # Determine return value from existing returns (prefer Constant returns)
+            default_return = "None"
+            for node in ast.walk(func_def):
+                if isinstance(node, ast.Return) and node.value is not None:
+                    val = node.value
+                    if isinstance(val, ast.Constant):
+                        if isinstance(val.value, bool):
+                            default_return = "False"
+                        elif isinstance(val.value, int):
+                            default_return = "0"
+                        elif isinstance(val.value, float):
+                            default_return = "0.0"
+                        elif isinstance(val.value, str):
+                            default_return = "''"
+                        break
+                    elif isinstance(val, ast.List):
+                        default_return = "[]"
+                        break
+
+            guard = ast.parse(f"if {chosen_param} <= 0:\n    return {default_return}").body[0]
+            ast.fix_missing_locations(guard)
+            func_def.body.insert(0, guard)
+            ast.fix_missing_locations(tree)
+            repaired = ast.unparse(tree)
+
+            return RepairResult(
+                original_code=code,
+                repaired_code=repaired,
+                repair_description=f"Added base case guard 'if {chosen_param} <= 0: return {default_return}'",
+                repair_line=func_def.lineno,
+            )
+        except Exception:
+            return None
+
+    def _repair_index_bounds(self, code: str, check) -> Optional[RepairResult]:
+        """Improved index-bounds repair: add a length guard at the top of the function."""
+        try:
+            tree = ast.parse(code)
+            func_def = None
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    func_def = node
+                    break
+
+            if not func_def:
+                return None
+
+            # Find the array parameter that was flagged
+            params = [arg.arg for arg in func_def.args.args]
+            arr_param = None
+
+            # Try to extract from the check description or counterexample
+            desc = check.description or ""
+            for p in params:
+                if p in desc:
+                    arr_param = p
+                    break
+            if arr_param is None and params:
+                arr_param = params[0]
+
+            if not arr_param:
+                return None
+
+            # Add a length guard: if not arr or len(arr) == 0: return None
+            guard = ast.parse(
+                f"if not {arr_param} or len({arr_param}) == 0:\n    return None"
+            ).body[0]
+            ast.fix_missing_locations(guard)
+            func_def.body.insert(0, guard)
+            ast.fix_missing_locations(tree)
+            repaired = ast.unparse(tree)
+
+            return RepairResult(
+                original_code=code,
+                repaired_code=repaired,
+                repair_description=f"Added empty-collection guard for '{arr_param}'",
+                repair_line=func_def.lineno,
+            )
+        except Exception:
+            return None
 
 
 def analyze_code(code: str, function_name: str = "", model_path: Optional[str] = None) -> SequentResult:

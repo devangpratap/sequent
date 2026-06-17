@@ -968,4 +968,346 @@ def roman_to_int(s):
             result += values.get(s[i], 0)
     return result
 ''', "category": "string"},
+
+    # --- Linked list operations ---
+    {"name": "linked_list_insert", "code": '''
+def linked_list_insert(head, val, pos):
+    new_node = {"val": val, "next": None}
+    if pos == 0:
+        new_node["next"] = head
+        return new_node
+    current = head
+    for i in range(pos - 1):
+        if current is None:
+            return head
+        current = current["next"]
+    if current is None:
+        return head
+    new_node["next"] = current["next"]
+    current["next"] = new_node
+    return head
+''', "category": "data_structure"},
+    {"name": "linked_list_delete", "code": '''
+def linked_list_delete(head, val):
+    if head is None:
+        return None
+    if head["val"] == val:
+        return head["next"]
+    current = head
+    while current["next"] is not None:
+        if current["next"]["val"] == val:
+            current["next"] = current["next"]["next"]
+            return head
+        current = current["next"]
+    return head
+''', "category": "data_structure"},
+    {"name": "linked_list_reverse", "code": '''
+def linked_list_reverse(head):
+    if head is None:
+        return None
+    prev = None
+    current = head
+    while current is not None:
+        next_node = current["next"]
+        current["next"] = prev
+        prev = current
+        current = next_node
+    return prev
+''', "category": "data_structure"},
+    {"name": "linked_list_detect_cycle", "code": '''
+def linked_list_detect_cycle(head):
+    if head is None:
+        return False
+    slow = head
+    fast = head
+    while fast is not None and fast["next"] is not None:
+        slow = slow["next"]
+        fast = fast["next"]["next"]
+        if slow is fast:
+            return True
+    return False
+''', "category": "data_structure"},
+
+    # --- Tree traversals ---
+    {"name": "inorder_traversal", "code": '''
+def inorder_traversal(root):
+    if root is None:
+        return []
+    result = []
+    result.extend(inorder_traversal(root.get("left")))
+    result.append(root["val"])
+    result.extend(inorder_traversal(root.get("right")))
+    return result
+''', "category": "tree"},
+    {"name": "preorder_traversal", "code": '''
+def preorder_traversal(root):
+    if root is None:
+        return []
+    result = [root["val"]]
+    result.extend(preorder_traversal(root.get("left")))
+    result.extend(preorder_traversal(root.get("right")))
+    return result
+''', "category": "tree"},
+    {"name": "level_order_traversal", "code": '''
+def level_order_traversal(root):
+    if root is None:
+        return []
+    result = []
+    queue = [root]
+    while len(queue) > 0:
+        node = queue.pop(0)
+        result.append(node["val"])
+        if node.get("left") is not None:
+            queue.append(node["left"])
+        if node.get("right") is not None:
+            queue.append(node["right"])
+    return result
+''', "category": "tree"},
+
+    # --- Graph algorithms ---
+    {"name": "bfs_traversal", "code": '''
+def bfs_traversal(graph, start):
+    if graph is None or start is None:
+        return []
+    visited = set()
+    queue = [start]
+    visited.add(start)
+    result = []
+    while len(queue) > 0:
+        node = queue.pop(0)
+        result.append(node)
+        for neighbor in graph.get(node, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return result
+''', "category": "graph"},
+    {"name": "dfs_traversal", "code": '''
+def dfs_traversal(graph, start):
+    if graph is None or start is None:
+        return []
+    visited = set()
+    result = []
+    stack = [start]
+    while len(stack) > 0:
+        node = stack.pop()
+        if node not in visited:
+            visited.add(node)
+            result.append(node)
+            for neighbor in reversed(graph.get(node, [])):
+                if neighbor not in visited:
+                    stack.append(neighbor)
+    return result
+''', "category": "graph"},
+    {"name": "topological_sort", "code": '''
+def topological_sort(graph, num_nodes):
+    if graph is None or num_nodes is None:
+        return None
+    in_degree = [0] * num_nodes
+    for node in range(num_nodes):
+        for neighbor in graph.get(node, []):
+            in_degree[neighbor] += 1
+    queue = []
+    for i in range(num_nodes):
+        if in_degree[i] == 0:
+            queue.append(i)
+    result = []
+    while len(queue) > 0:
+        node = queue.pop(0)
+        result.append(node)
+        for neighbor in graph.get(node, []):
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+    if len(result) != num_nodes:
+        return None
+    return result
+''', "category": "graph"},
+
+    # --- String algorithms ---
+    {"name": "is_palindrome", "code": '''
+def is_palindrome(s):
+    if s is None:
+        return False
+    left = 0
+    right = len(s) - 1
+    while left < right:
+        if s[left] != s[right]:
+            return False
+        left += 1
+        right -= 1
+    return True
+''', "category": "string"},
+    {"name": "kmp_pattern_match", "code": '''
+def kmp_pattern_match(text, pattern):
+    if text is None or pattern is None:
+        return -1
+    if len(pattern) == 0:
+        return 0
+    lps = [0] * len(pattern)
+    length = 0
+    i = 1
+    while i < len(pattern):
+        if pattern[i] == pattern[length]:
+            length += 1
+            lps[i] = length
+            i += 1
+        else:
+            if length != 0:
+                length = lps[length - 1]
+            else:
+                lps[i] = 0
+                i += 1
+    j = 0
+    i = 0
+    while i < len(text):
+        if text[i] == pattern[j]:
+            i += 1
+            j += 1
+        if j == len(pattern):
+            return i - j
+        elif i < len(text) and text[i] != pattern[j]:
+            if j != 0:
+                j = lps[j - 1]
+            else:
+                i += 1
+    return -1
+''', "category": "string"},
+
+    # --- Dynamic programming ---
+    {"name": "knapsack_01", "code": '''
+def knapsack_01(weights, values, capacity):
+    if weights is None or values is None or capacity is None:
+        return 0
+    n = len(weights)
+    dp = [[0] * (capacity + 1) for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        for w in range(capacity + 1):
+            dp[i][w] = dp[i - 1][w]
+            if weights[i - 1] <= w:
+                val = dp[i - 1][w - weights[i - 1]] + values[i - 1]
+                if val > dp[i][w]:
+                    dp[i][w] = val
+    return dp[n][capacity]
+''', "category": "dp"},
+    {"name": "longest_common_subsequence", "code": '''
+def longest_common_subsequence(s1, s2):
+    if s1 is None or s2 is None:
+        return 0
+    m = len(s1)
+    n = len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s1[i - 1] == s2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    return dp[m][n]
+''', "category": "dp"},
+    {"name": "edit_distance", "code": '''
+def edit_distance(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    m = len(s1)
+    n = len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s1[i - 1] == s2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1]
+            else:
+                dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+    return dp[m][n]
+''', "category": "dp"},
+
+    # --- Stack/queue operations ---
+    {"name": "balanced_parentheses", "code": '''
+def balanced_parentheses(s):
+    if s is None:
+        return False
+    stack = []
+    pairs = {')': '(', ']': '[', '}': '{'}
+    for c in s:
+        if c in ('(', '[', '{'):
+            stack.append(c)
+        elif c in pairs:
+            if len(stack) == 0 or stack[-1] != pairs[c]:
+                return False
+            stack.pop()
+    return len(stack) == 0
+''', "category": "data_structure"},
+    {"name": "min_stack_operations", "code": '''
+def min_stack_operations(operations):
+    if operations is None:
+        return None
+    stack = []
+    min_stack = []
+    results = []
+    for op, val in operations:
+        if op == "push":
+            stack.append(val)
+            if len(min_stack) == 0 or val <= min_stack[-1]:
+                min_stack.append(val)
+        elif op == "pop":
+            if len(stack) == 0:
+                results.append(None)
+                continue
+            popped = stack.pop()
+            if popped == min_stack[-1]:
+                min_stack.pop()
+            results.append(popped)
+        elif op == "min":
+            if len(min_stack) == 0:
+                results.append(None)
+            else:
+                results.append(min_stack[-1])
+    return results
+''', "category": "data_structure"},
+
+    # --- Math utilities ---
+    {"name": "gcd", "code": '''
+def gcd(a, b):
+    if a is None or b is None:
+        return None
+    a = abs(a)
+    b = abs(b)
+    while b != 0:
+        a, b = b, a % b
+    return a
+''', "category": "math"},
+    {"name": "power_recursive", "code": '''
+def power_recursive(base, exp):
+    if base is None or exp is None:
+        return None
+    if exp < 0:
+        return None
+    if exp == 0:
+        return 1
+    if exp % 2 == 0:
+        half = power_recursive(base, exp // 2)
+        return half * half
+    else:
+        return base * power_recursive(base, exp - 1)
+''', "category": "math"},
+    {"name": "matrix_multiply", "code": '''
+def matrix_multiply(a, b):
+    if a is None or b is None:
+        return None
+    rows_a = len(a)
+    cols_a = len(a[0])
+    cols_b = len(b[0])
+    if cols_a != len(b):
+        return None
+    result = [[0] * cols_b for _ in range(rows_a)]
+    for i in range(rows_a):
+        for j in range(cols_b):
+            for k in range(cols_a):
+                result[i][j] += a[i][k] * b[k][j]
+    return result
+''', "category": "math"},
 ]

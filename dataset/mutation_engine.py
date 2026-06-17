@@ -31,6 +31,12 @@ class BugType(Enum):
     MISSING_RETURN = "missing_return"
     WRONG_INIT = "wrong_init"
     SWAP_ARGS = "swap_args"
+    SWAP_AND_OR = "swap_and_or"
+    REMOVE_RETURN = "remove_return"
+    FLIP_BOOLEAN = "flip_boolean"
+    SWAP_PLUS_MINUS = "swap_plus_minus"
+    REMOVE_BASE_CASE = "remove_base_case"
+    WRONG_INIT_VALUE = "wrong_init_value"
 
 
 @dataclass
@@ -394,6 +400,204 @@ class SwapArgsMutator(ast.NodeTransformer):
 
 
 # ---------------------------------------------------------------------------
+# New mutator classes for expanded bug coverage
+# ---------------------------------------------------------------------------
+
+class SwapAndOrMutator(ast.NodeTransformer):
+    """Swap `and` with `or` and vice versa in boolean expressions."""
+
+    def __init__(self):
+        self.mutations = []
+        self.mutated = False
+
+    def visit_BoolOp(self, node):
+        self.generic_visit(node)
+        if self.mutated:
+            return node
+        if isinstance(node.op, ast.And):
+            node.op = ast.Or()
+            self.mutations.append((getattr(node, 'lineno', 1), "Swapped 'and' to 'or'"))
+            self.mutated = True
+        elif isinstance(node.op, ast.Or):
+            node.op = ast.And()
+            self.mutations.append((getattr(node, 'lineno', 1), "Swapped 'or' to 'and'"))
+            self.mutated = True
+        return node
+
+
+class RemoveReturnMutator(ast.NodeTransformer):
+    """Delete a return statement from a branch entirely (replace with pass)."""
+
+    def __init__(self):
+        self.mutations = []
+        self.mutated = False
+        self.return_count = 0
+
+    def _count_returns(self, tree):
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Return):
+                self.return_count += 1
+
+    def visit_Return(self, node):
+        if self.mutated:
+            return node
+        # Only remove if there are multiple returns (keep function somewhat valid)
+        if self.return_count > 1 and random.random() < 0.6:
+            self.mutations.append((getattr(node, 'lineno', 1),
+                                   "Deleted return statement from branch"))
+            self.mutated = True
+            return ast.Pass()
+        return node
+
+
+class FlipBooleanMutator(ast.NodeTransformer):
+    """Swap True with False and vice versa."""
+
+    def __init__(self):
+        self.mutations = []
+        self.mutated = False
+
+    def visit_Constant(self, node):
+        if self.mutated:
+            return node
+        if node.value is True:
+            node.value = False
+            self.mutations.append((getattr(node, 'lineno', 1), "Flipped True to False"))
+            self.mutated = True
+        elif node.value is False:
+            node.value = True
+            self.mutations.append((getattr(node, 'lineno', 1), "Flipped False to True"))
+            self.mutated = True
+        return node
+
+
+class SwapPlusMinusMutator(ast.NodeTransformer):
+    """Swap + with - and vice versa."""
+
+    def __init__(self):
+        self.mutations = []
+        self.mutated = False
+
+    def visit_BinOp(self, node):
+        self.generic_visit(node)
+        if self.mutated:
+            return node
+        if isinstance(node.op, ast.Add):
+            node.op = ast.Sub()
+            self.mutations.append((getattr(node, 'lineno', 1), "Swapped '+' to '-'"))
+            self.mutated = True
+        elif isinstance(node.op, ast.Sub):
+            node.op = ast.Add()
+            self.mutations.append((getattr(node, 'lineno', 1), "Swapped '-' to '+'"))
+            self.mutated = True
+        return node
+
+    def visit_AugAssign(self, node):
+        self.generic_visit(node)
+        if self.mutated:
+            return node
+        if isinstance(node.op, ast.Add):
+            node.op = ast.Sub()
+            self.mutations.append((getattr(node, 'lineno', 1), "Swapped '+=' to '-='"))
+            self.mutated = True
+        elif isinstance(node.op, ast.Sub):
+            node.op = ast.Add()
+            self.mutations.append((getattr(node, 'lineno', 1), "Swapped '-=' to '+='"))
+            self.mutated = True
+        return node
+
+
+class RemoveBaseCaseMutator(ast.NodeTransformer):
+    """Remove the base case from a recursive function."""
+
+    def __init__(self):
+        self.mutations = []
+        self.mutated = False
+        self.has_recursion = False
+        self.func_name = None
+
+    def _detect_recursion(self, tree):
+        """Check if function calls itself."""
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                self.func_name = node.name
+        if self.func_name is None:
+            return
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name) and node.func.id == self.func_name:
+                    self.has_recursion = True
+
+    def visit_If(self, node):
+        self.generic_visit(node)
+        if self.mutated or not self.has_recursion:
+            return node
+        # Base cases typically return a constant or simple value early
+        if isinstance(node.body, list) and len(node.body) == 1:
+            stmt = node.body[0]
+            if isinstance(stmt, ast.Return):
+                # This looks like a base case — remove the entire if block
+                self.mutations.append((getattr(node, 'lineno', 1),
+                                       "Removed base case from recursive function"))
+                self.mutated = True
+                if node.orelse:
+                    return node.orelse if isinstance(node.orelse, list) else [node.orelse]
+                return ast.Pass()
+        return node
+
+
+class WrongInitValueMutator(ast.NodeTransformer):
+    """Initialize variables to semantically wrong values (0→1, empty→None, etc.)."""
+
+    def __init__(self):
+        self.mutations = []
+        self.mutated = False
+
+    def visit_Assign(self, node):
+        self.generic_visit(node)
+        if self.mutated:
+            return node
+        if len(node.targets) != 1:
+            return node
+        # Swap numeric inits
+        if isinstance(node.value, ast.Constant):
+            val = node.value.value
+            new_val = None
+            if val == 0:
+                new_val = 1
+            elif val == 1:
+                new_val = 0
+            elif val == -1:
+                new_val = 0
+            elif val is None:
+                # None → empty list
+                node.value = ast.List(elts=[], ctx=ast.Load())
+                ast.fix_missing_locations(node)
+                self.mutations.append((getattr(node, 'lineno', 1),
+                                       "Changed None init to []"))
+                self.mutated = True
+                return node
+            if new_val is not None:
+                self.mutations.append((getattr(node, 'lineno', 1),
+                                       f"Changed init from {val} to {new_val}"))
+                node.value = ast.Constant(value=new_val)
+                self.mutated = True
+        # Swap empty list → None
+        elif isinstance(node.value, ast.List) and len(node.value.elts) == 0:
+            self.mutations.append((getattr(node, 'lineno', 1),
+                                   "Changed [] init to None"))
+            node.value = ast.Constant(value=None)
+            self.mutated = True
+        # Swap empty dict → None
+        elif isinstance(node.value, ast.Dict) and len(node.value.keys) == 0:
+            self.mutations.append((getattr(node, 'lineno', 1),
+                                   "Changed {} init to None"))
+            node.value = ast.Constant(value=None)
+            self.mutated = True
+        return node
+
+
+# ---------------------------------------------------------------------------
 # Main mutation interface
 # ---------------------------------------------------------------------------
 
@@ -407,6 +611,12 @@ MUTATORS = {
     BugType.MISSING_RETURN: MissingReturnMutator,
     BugType.WRONG_INIT: WrongInitMutator,
     BugType.SWAP_ARGS: SwapArgsMutator,
+    BugType.SWAP_AND_OR: SwapAndOrMutator,
+    BugType.REMOVE_RETURN: RemoveReturnMutator,
+    BugType.FLIP_BOOLEAN: FlipBooleanMutator,
+    BugType.SWAP_PLUS_MINUS: SwapPlusMinusMutator,
+    BugType.REMOVE_BASE_CASE: RemoveBaseCaseMutator,
+    BugType.WRONG_INIT_VALUE: WrongInitValueMutator,
 }
 
 
@@ -429,6 +639,10 @@ def mutate_function(code: str, bug_type: BugType, function_name: str = "") -> Op
         mutator._collect_variables(tree)
     if isinstance(mutator, MissingReturnMutator):
         mutator._count_returns(tree)
+    if isinstance(mutator, RemoveReturnMutator):
+        mutator._count_returns(tree)
+    if isinstance(mutator, RemoveBaseCaseMutator):
+        mutator._detect_recursion(tree)
 
     mutated_tree = mutator.visit(copy.deepcopy(tree))
 
@@ -469,6 +683,12 @@ RELIABLE_BUG_TYPES = [
     BugType.INTEGER_OVERFLOW,
     BugType.MISSING_RETURN,
     BugType.WRONG_INIT,
+    BugType.SWAP_AND_OR,
+    BugType.REMOVE_RETURN,
+    BugType.FLIP_BOOLEAN,
+    BugType.SWAP_PLUS_MINUS,
+    BugType.REMOVE_BASE_CASE,
+    BugType.WRONG_INIT_VALUE,
 ]
 
 
