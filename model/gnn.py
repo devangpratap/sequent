@@ -154,6 +154,8 @@ def build_pyg_data(graph_dict: dict) -> "Data":
         data.edge_type = graph_dict['edge_type']
     if 'z3_label' in graph_dict:
         data.z3_label = graph_dict['z3_label']
+    if 'bug_type' in graph_dict and graph_dict['bug_type'] is not None:
+        data.bug_type = graph_dict['bug_type']
     return data
 
 

@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "publisher": "devangpratap",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devangpratap/sequent"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

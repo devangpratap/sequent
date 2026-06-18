@@ -1,4 +1,4 @@
-.PHONY: test lint build clean dataset train
+.PHONY: test lint build clean dataset train deploy-frontend
 
 test:
 	python3 -m pytest tests/ -v --tb=short
@@ -19,3 +19,6 @@ dataset:
 
 train:
 	python3 -m model.train
+
+deploy-frontend:
+	cd frontend && npm run build

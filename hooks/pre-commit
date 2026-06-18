@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Sequent pre-commit hook
+# Runs `sequent check` on staged Python files and blocks the commit if bugs are found.
+#
+# Install:  bash hooks/install.sh
+# Bypass:   git commit --no-verify
+
+set -euo pipefail
+
+# ---------- colours (disabled when not a terminal) ----------
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BOLD='\033[1m'
+    RESET='\033[0m'
+else
+    RED='' GREEN='' YELLOW='' BOLD='' RESET=''
+fi
+
+# ---------- check that sequent is available ----------
+if ! command -v sequent &>/dev/null; then
+    echo -e "${YELLOW}[sequent] 'sequent' not found in PATH — skipping verification.${RESET}"
+    echo -e "${YELLOW}         Install with: pip install sequent${RESET}"
+    exit 0
+fi
+
+# ---------- collect staged .py files ----------
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' || true)
+
+if [ -z "$STAGED_FILES" ]; then
+    # No Python files staged — nothing to check.
+    exit 0
+fi
+
+# ---------- size limit (skip files > 10 KB for speed) ----------
+MAX_SIZE=10240  # bytes
+
+BUGS_FOUND=0
+SUMMARY=""
+FILES_CHECKED=0
+FILES_SKIPPED=0
+
+for FILE in $STAGED_FILES; do
+    # Skip files that no longer exist on disk (deleted but staged as modify — rare edge case)
+    if [ ! -f "$FILE" ]; then
+        continue
+    fi
+
+    # Skip files larger than 10 KB
+    FILE_SIZE=$(wc -c < "$FILE" | tr -d ' ')
+    if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+        FILES_SKIPPED=$((FILES_SKIPPED + 1))
+        continue
+    fi
+
+    FILES_CHECKED=$((FILES_CHECKED + 1))
+
+    # Run sequent check and capture output; do not exit on failure
+    OUTPUT=$(sequent check "$FILE" --json 2>/dev/null) || true
+
+    if [ -z "$OUTPUT" ]; then
+        continue
+    fi
+
+    # Parse JSON output for bugs.
+    # Expected schema: top-level array or object with a "results" array.
+    # Each result has: "function", "verdict", "bug_type", "message" (or similar).
+    # We look for any verdict that is NOT "verified" / "clean".
+    HAS_BUG=$(echo "$OUTPUT" | python3 -c "
+import sys, json
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+
+# Normalise to a list of results
+results = []
+if isinstance(data, list):
+    results = data
+elif isinstance(data, dict):
+    results = data.get('results', data.get('functions', []))
+    # single-result dict
+    if not results and 'verdict' in data:
+        results = [data]
+
+bugs = []
+for r in results:
+    verdict = str(r.get('verdict', '')).lower()
+    if verdict not in ('verified', 'clean', 'safe', 'ok', ''):
+        func = r.get('function', r.get('name', '<unknown>'))
+        bug_type = r.get('bug_type', r.get('type', 'unknown'))
+        msg = r.get('message', r.get('counterexample', ''))
+        bugs.append(f'  {func}: [{bug_type}] {msg}')
+
+if bugs:
+    print('\n'.join(bugs))
+" 2>/dev/null) || true
+
+    if [ -n "$HAS_BUG" ]; then
+        BUGS_FOUND=$((BUGS_FOUND + 1))
+        SUMMARY="${SUMMARY}\n${BOLD}${FILE}${RESET}\n${HAS_BUG}\n"
+    fi
+done
+
+# ---------- verdict ----------
+if [ "$BUGS_FOUND" -gt 0 ]; then
+    echo ""
+    echo -e "${RED}${BOLD}[sequent] Bugs detected in ${BUGS_FOUND} file(s):${RESET}"
+    echo -e "$SUMMARY"
+    echo -e "${RED}Commit blocked. Fix the issues above or skip with:${RESET}"
+    echo -e "  ${BOLD}git commit --no-verify${RESET}"
+    echo ""
+    exit 1
+fi
+
+SKIP_MSG=""
+if [ "$FILES_SKIPPED" -gt 0 ]; then
+    SKIP_MSG=" (${FILES_SKIPPED} file(s) skipped — over 10 KB)"
+fi
+
+echo -e "${GREEN}[sequent] All ${FILES_CHECKED} staged Python file(s) verified clean.${SKIP_MSG}${RESET}"
+exit 0

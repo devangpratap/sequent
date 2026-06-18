@@ -81,6 +81,47 @@ $ sequent check test_buggy.py
 | `missing_return` | Missing return in code path |
 | `wrong_init` | Incorrect variable initialization |
 
+## Benchmark
+
+Sequent vs pylint vs pyflakes on 20 hand-crafted cases (14 buggy, 6 clean). Static analyzers
+focus on style and syntax — they cannot reason about semantics, so they miss every logic bug.
+
+| Bug Category | Case | Bug | Sequent | pylint | pyflakes |
+|---|---|---|---|---|---|
+| Off-by-one | `binary_search_obo` | `<` vs `<=` in loop | Detected | Missed | Missed |
+| Off-by-one | `bubble_sort_obo` | Index out of bounds | Detected | Missed | Missed |
+| None deref | `find_max_none` | No None check | Detected | Missed | Missed |
+| None deref | `reverse_string_none` | No None check | Detected | Missed | Missed |
+| None deref | `sum_list_none` | No None check | Missed | Missed | Missed |
+| Div-by-zero | `average_no_guard` | Empty list division | Detected | Missed | Missed |
+| Div-by-zero | `normalize_no_guard` | Zero divisor | Detected | Missed | Missed |
+| Wrong operator | `is_even_wrong_op` | `== 1` vs `== 0` | Detected | Missed | Missed |
+| Wrong operator | `min_of_two_wrong` | Returns max | Detected | Missed | Missed |
+| Unsafe arith | `factorial_no_guard` | Negative n silent | Detected | Missed | Missed |
+| Boundary | `second_largest_no_check` | No length check | Detected | Missed | Missed |
+| Boundary | `pop_empty` | No empty check | Detected | Missed | Missed |
+| Mutation | `remove_dupes_mutate` | Mutate while iterating | Detected | Missed | Missed |
+| Logic | `swap_wrong` | Overwrite before save | Missed | Missed | Missed |
+| Clean | `binary_search_correct` | — | FP | OK | OK |
+| Clean | `find_max_correct` | — | FP | OK | OK |
+| Clean | `safe_divide_correct` | — | OK | OK | OK |
+| Clean | `fibonacci_correct` | — | OK | OK | OK |
+| Clean | `is_palindrome_correct` | — | FP | OK | OK |
+| Clean | `gcd_correct` | — | FP | OK | OK |
+
+**Summary (20 cases)**
+
+| Tool | Correct | Bugs found (of 14) | False positives (of 6) | Accuracy |
+|---|---|---|---|---|
+| **Sequent** | **14/20** | **12/14 (85.7%)** | 4/6 | **70.0%** |
+| pylint | 6/20 | 0/14 (0%) | 0/6 | 30.0% |
+| pyflakes | 6/20 | 0/14 (0%) | 0/6 | 30.0% |
+
+Sequent catches semantic bugs (off-by-one, division by zero, wrong operators, missing guards)
+that pylint and pyflakes are structurally blind to. The tradeoff is a higher false-positive rate
+on clean code — Sequent's Z3 verifier is conservative and flags potential edge cases even in
+correct implementations. Average Sequent latency: **230ms** per function.
+
 ## Z3 property checks
 
 - Comparison consistency (off-by-one in loops)
@@ -111,6 +152,31 @@ python -m backend.server
 # Start the frontend (development)
 cd frontend && npm install && npm run dev
 ```
+
+## Git Hook
+
+Sequent can verify staged Python files automatically before every commit.
+
+**Manual install** (copies hook into `.git/hooks/`):
+
+```bash
+bash hooks/install.sh              # install
+bash hooks/install.sh --uninstall  # remove
+```
+
+**pre-commit framework** ([pre-commit.com](https://pre-commit.com)):
+
+Add to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/devangpratapsingh/sequent
+    rev: main
+    hooks:
+      - id: sequent-verify
+```
+
+The hook skips files over 10 KB for speed. To bypass on a single commit, use `git commit --no-verify`.
 
 ## GitHub Action
 

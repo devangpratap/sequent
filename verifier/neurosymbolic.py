@@ -109,13 +109,22 @@ class SequentResult:
 class SequentEngine:
     """Main neurosymbolic verification engine."""
 
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: Optional[str] = None, self_learn: bool = True):
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else
             'mps' if torch.backends.mps.is_available() else 'cpu'
         )
         self.model = None
         self.verifier = Z3Verifier(timeout_ms=5000)
+
+        # Self-learning: collect experience from every analysis run
+        self.experience_store = None
+        if self_learn:
+            try:
+                from verifier.self_learn import ExperienceStore
+                self.experience_store = ExperienceStore()
+            except Exception:
+                pass  # graceful degradation
 
         if model_path:
             self.load_model(model_path)
@@ -199,6 +208,15 @@ class SequentEngine:
                 repair.verified = not result.post_repair_verification.has_bugs
 
         result.total_time_ms = (time.time() - t0) * 1000
+
+        # Stage 5: Collect experience for self-learning
+        if self.experience_store is not None:
+            try:
+                from verifier.self_learn import collect_experience
+                collect_experience(result, self.experience_store)
+            except Exception:
+                pass  # never let self-learning break the main pipeline
+
         return result
 
     @torch.no_grad()

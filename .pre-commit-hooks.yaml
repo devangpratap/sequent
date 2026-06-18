@@ -1,0 +1,6 @@
+- id: sequent-verify
+  name: Sequent Verification
+  entry: sequent check
+  language: python
+  types: [python]
+  additional_dependencies: ['sequent-verify']

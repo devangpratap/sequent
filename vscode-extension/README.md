@@ -2,8 +2,6 @@
 
 Sequent brings neurosymbolic Python verification directly into your editor. A GNN trained on code property graphs proposes potential bugs, then Z3 confirms or refutes each finding with formal proofs. Diagnostics appear as squiggly underlines with hover details, and verified auto-repairs are offered as Quick Fix code actions.
 
-![Sequent in action](screenshot-placeholder.png)
-
 ## Install
 
 **From VSIX (local build):**

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { python } from '@codemirror/lang-python'
 import { EditorView } from '@codemirror/view'
@@ -356,62 +356,119 @@ function ResultPanel({ result }) {
 
 function HeatmapPanel({ result, code }) {
   const lines = code.split('\n')
-  const lineScores = {}
-  if (result.node_lines && result.node_scores) {
-    result.node_lines.forEach((line, i) => {
-      if (line > 0) {
-        lineScores[line] = Math.max(lineScores[line] || 0, result.node_scores[i])
-      }
-    })
-  }
+  const [hoveredLine, setHoveredLine] = useState(null)
+
+  const lineScores = useMemo(() => {
+    const scores = {}
+    if (result.node_lines && result.node_scores) {
+      result.node_lines.forEach((line, i) => {
+        if (line > 0) {
+          scores[line] = Math.max(scores[line] || 0, result.node_scores[i])
+        }
+      })
+    }
+    return scores
+  }, [result])
 
   const maxScore = Math.max(...Object.values(lineScores), 0.01)
+
+  const attentionEdges = result.attention || []
+
+  // Edges connected to hovered line
+  const activeEdges = useMemo(() => {
+    if (hoveredLine === null) return []
+    return attentionEdges.filter(
+      e => e.src_line === hoveredLine || e.dst_line === hoveredLine
+    )
+  }, [hoveredLine, attentionEdges])
+
+  const connectedLines = useMemo(() => {
+    const set = new Set()
+    activeEdges.forEach(e => {
+      set.add(e.src_line)
+      set.add(e.dst_line)
+    })
+    return set
+  }, [activeEdges])
 
   return (
     <div style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
         <div>
-          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem', textShadow: '0 0 5px rgba(196,101,58,0.35), 0 0 14px rgba(196,101,58,0.15)' }}>
-            GNN Confidence Heatmap
+          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            <span style={{ color: 'var(--accent-4)' }}>GNN</span> Attention Heatmap
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            node-level bug probability overlaid on source — warmer = higher suspicion
+            per-line bug probability with attention edge flow — hover to explore
           </div>
         </div>
-        {/* Legend */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>0%</span>
-          <div style={{
-            width: '8rem', height: '0.5rem',
-            background: 'linear-gradient(90deg, rgba(30,180,220,0.6), rgba(80,100,100,0.6), rgba(255,150,20,0.8), rgba(255,30,0,0.9))',
-            borderRadius: '2px',
-          }} />
-          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>100%</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {/* Legend */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ fontSize: '0.6rem', color: 'var(--accent-2)' }}>safe</span>
+            <div style={{
+              width: '6rem', height: '0.4rem',
+              background: 'linear-gradient(90deg, rgba(158,206,106,0.7), rgba(224,175,104,0.7), rgba(247,118,142,0.9))',
+              borderRadius: '2px',
+            }} />
+            <span style={{ fontSize: '0.6rem', color: 'var(--accent-3)' }}>buggy</span>
+          </div>
+          {/* Confidence badge */}
+          {result.gnn && (
+            <div style={{
+              padding: '0.2rem 0.6rem',
+              border: '1px solid rgba(187,154,247,0.4)',
+              fontSize: '0.7rem',
+              color: 'var(--accent-4)',
+            }}>
+              {(result.gnn.confidence * 100).toFixed(0)}% conf
+            </div>
+          )}
         </div>
       </div>
 
       {/* Code lines */}
-      <div style={{ padding: '0.75rem 0', fontSize: '0.8rem' }}>
+      <div style={{ padding: '0.5rem 0', fontSize: '0.78rem' }}>
         {lines.map((line, i) => {
           const lineNum = i + 1
           const score = lineScores[lineNum] || 0
           const { r, g, b } = scoreToColor(score)
           const intensity = score / maxScore
+          const isHovered = hoveredLine === lineNum
+          const isConnected = connectedLines.has(lineNum) && !isHovered
 
           return (
             <div
               key={i}
+              onMouseEnter={() => setHoveredLine(lineNum)}
+              onMouseLeave={() => setHoveredLine(null)}
               style={{
                 display: 'flex', alignItems: 'center',
                 padding: '0.3rem 1.25rem',
-                background: score > 0.05 ? `rgba(${r}, ${g}, ${b}, ${Math.min(intensity * 0.2, 0.25)})` : 'transparent',
-                borderLeft: score > 0.3 ? `3px solid rgba(${r}, ${g}, ${b}, 0.8)` : '3px solid transparent',
-                transition: 'background 0.2s',
+                background: isHovered
+                  ? `rgba(${r}, ${g}, ${b}, 0.25)`
+                  : isConnected
+                  ? 'rgba(187, 154, 247, 0.08)'
+                  : score > 0.05
+                  ? `rgba(${r}, ${g}, ${b}, ${Math.min(intensity * 0.18, 0.22)})`
+                  : 'transparent',
+                borderLeft: score > 0.3
+                  ? `3px solid rgba(${r}, ${g}, ${b}, 0.8)`
+                  : isConnected
+                  ? '3px solid rgba(187, 154, 247, 0.4)'
+                  : '3px solid transparent',
+                cursor: 'default',
+                transition: 'background 0.15s, border-color 0.15s',
               }}
             >
               {/* Line number */}
-              <span style={{ width: '2rem', textAlign: 'right', color: 'var(--text-muted)', fontSize: '0.7rem', userSelect: 'none', marginRight: '1rem', flexShrink: 0 }}>
+              <span style={{
+                width: '2rem', textAlign: 'right',
+                color: isHovered ? 'var(--accent-4)' : 'var(--text-muted)',
+                fontSize: '0.7rem', userSelect: 'none', marginRight: '1rem', flexShrink: 0,
+                fontWeight: isHovered ? 700 : 400,
+              }}>
                 {lineNum}
               </span>
 
@@ -419,6 +476,27 @@ function HeatmapPanel({ result, code }) {
               <span style={{ flex: 1, whiteSpace: 'pre', fontFamily: 'inherit' }}>
                 {line || ' '}
               </span>
+
+              {/* Attention arrows */}
+              {isHovered && activeEdges.length > 0 && (
+                <span style={{
+                  fontSize: '0.6rem', color: 'var(--accent-4)', marginRight: '0.5rem',
+                  opacity: 0.8, flexShrink: 0,
+                }}>
+                  {activeEdges.map((e, j) => {
+                    const otherLine = e.src_line === lineNum ? e.dst_line : e.src_line
+                    const dir = e.src_line === lineNum ? '\u2192' : '\u2190'
+                    return (
+                      <span key={j} style={{ marginLeft: j > 0 ? '0.4rem' : 0 }}>
+                        {dir}L{otherLine}
+                        <span style={{ color: 'var(--accent-5)', marginLeft: '2px' }}>
+                          ({(e.weight * 100).toFixed(0)}%)
+                        </span>
+                      </span>
+                    )
+                  })}
+                </span>
+              )}
 
               {/* Score bar + percentage */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, width: '7rem', justifyContent: 'flex-end' }}>
@@ -432,7 +510,12 @@ function HeatmapPanel({ result, code }) {
                         transition: 'width 0.3s',
                       }} />
                     </div>
-                    <span style={{ fontSize: '0.65rem', color: `rgb(${r}, ${Math.max(g, 80)}, ${Math.max(b, 80)})`, width: '2.5rem', textAlign: 'right' }}>
+                    <span style={{
+                      fontSize: '0.65rem',
+                      color: `rgb(${r}, ${Math.max(g, 80)}, ${Math.max(b, 80)})`,
+                      width: '2.5rem', textAlign: 'right',
+                      fontWeight: score > 0.5 ? 700 : 400,
+                    }}>
                       {(score * 100).toFixed(0)}%
                     </span>
                   </>
@@ -442,6 +525,22 @@ function HeatmapPanel({ result, code }) {
           )
         })}
       </div>
+
+      {/* Footer with attention summary */}
+      {attentionEdges.length > 0 && (
+        <div style={{
+          padding: '0.75rem 1.25rem',
+          borderTop: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '0.65rem', color: 'var(--text-muted)',
+        }}>
+          <div>
+            <span style={{ color: 'var(--accent-4)' }}>neural</span>{' '}
+            {attentionEdges.length} attention edges
+          </div>
+          <div style={{ opacity: 0.6 }}>hover lines to see attention flow</div>
+        </div>
+      )}
     </div>
   )
 }

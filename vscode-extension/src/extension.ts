@@ -578,7 +578,7 @@ function provideSequentHover(
     if (func.z3.counterexamples && func.z3.counterexamples.length > 0) {
       md.appendMarkdown("**Counterexamples:**\n\n");
       for (const cx of func.z3.counterexamples) {
-        md.appendCodeBlock(
+        md.appendCodeblock(
           `${cx.property}: ${cx.description}\n` +
             JSON.stringify(cx.counterexample, null, 2),
           "json"

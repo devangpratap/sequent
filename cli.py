@@ -203,6 +203,37 @@ def main():
     check_parser.add_argument('--cert', metavar='FILE', help='Export proof certificate to FILE')
     check_parser.add_argument('-v', '--verbose', action='store_true', help='Show repaired code')
     check_parser.add_argument('--no-gnn', action='store_true', help='Z3-only mode (skip GNN)')
+    check_parser.add_argument('--no-learn', action='store_true', help='Disable self-learning data collection')
+
+    # Self-learning commands
+    learn_parser = sub.add_parser('learn', help='Run self-learning cycle (fine-tune GNN on accumulated experience)')
+    learn_parser.add_argument('--epochs', type=int, default=30, help='Fine-tuning epochs (default: 30)')
+    learn_parser.add_argument('--lr', type=float, default=0.0001, help='Learning rate (default: 0.0001)')
+    learn_parser.add_argument('--min-samples', type=int, default=50, help='Minimum samples to proceed (default: 50)')
+    learn_parser.add_argument('--force', action='store_true', help='Learn even with fewer than min-samples')
+    learn_parser.add_argument('--rollback', action='store_true', help='Rollback to previous model version')
+
+    exp_parser = sub.add_parser('experience', help='View self-learning experience stats')
+    exp_parser.add_argument('--export', metavar='FILE', help='Export experience as training JSON')
+    exp_parser.add_argument('--clear', action='store_true', help='Clear all stored experience')
+
+    # Watch command
+    watch_parser = sub.add_parser('watch', help='Watch files/directories and re-analyze on change')
+    watch_parser.add_argument('paths', nargs='+', help='Files or directories to watch')
+    watch_parser.add_argument('--interval', type=float, default=1.0, help='Poll interval in seconds (default: 1.0)')
+
+    # Badge command
+    badge_parser = sub.add_parser('badge', help='Generate SVG verification badge')
+    badge_parser.add_argument('file', help='Python file to analyze')
+    badge_parser.add_argument('-o', '--output', metavar='FILE', default='sequent-badge.svg',
+                              help='Output SVG file (default: sequent-badge.svg)')
+    badge_parser.add_argument('--no-gnn', action='store_true', help='Z3-only mode')
+
+    # LSP command
+    lsp_parser = sub.add_parser('lsp', help='Start LSP server for editor integration')
+    lsp_parser.add_argument('--tcp', action='store_true', help='Run in TCP mode')
+    lsp_parser.add_argument('--port', type=int, default=2087, help='TCP port (default: 2087)')
+    lsp_parser.add_argument('--host', default='127.0.0.1', help='TCP host (default: 127.0.0.1)')
 
     args = parser.parse_args()
 
@@ -244,7 +275,7 @@ def main():
             os.path.dirname(os.path.abspath(__file__)),
             'checkpoints', 'best_model.pt'
         )
-        engine = SequentEngine(model_path=model_path)
+        engine = SequentEngine(model_path=model_path, self_learn=not args.no_learn)
 
         if not args.json:
             print(f"  {C.PURPLE_DIM}Analyzing {len(functions)} function(s) in {C.WHITE}{args.file}{C.RESET}")
@@ -281,8 +312,178 @@ def main():
             if not args.json:
                 print(f"  {C.PURPLE}📜 Proof certificate → {C.WHITE}{args.cert}{C.RESET}\n")
 
+        # Self-learning status
+        if not args.json and not args.no_learn and engine.experience_store:
+            stats = engine.experience_store.get_stats()
+            if stats["total"] > 0:
+                print(f"  {C.PURPLE_DIM}Self-learning: {stats['total']} samples collected "
+                      f"({stats['since_last_learn']} since last cycle){C.RESET}")
+                if engine.experience_store.should_learn():
+                    print(f"  {C.PURPLE}Ready for learning cycle! Run: {C.WHITE}sequent learn{C.RESET}\n")
+
         # Exit code: 1 if any bugs found
         sys.exit(1 if any(r.consensus_buggy for r in results) else 0)
+
+    elif args.command == 'learn':
+        print(LOGO)
+        from verifier.self_learn import ExperienceStore, OnlineLearner
+
+        store = ExperienceStore()
+        stats = store.get_stats()
+
+        if args.rollback:
+            model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'checkpoints', 'best_model.pt')
+            learner = OnlineLearner(checkpoint_path=model_path, experience_store=store)
+            if learner.rollback():
+                print(f"  {C.GREEN}Rolled back to previous model version{C.RESET}\n")
+            else:
+                print(f"  {C.ORANGE}No previous model version found{C.RESET}\n")
+            return
+
+        print(f"  {C.PURPLE_BOLD}Self-Learning Cycle{C.RESET}")
+        print(f"  {C.PURPLE_DIM}{'─' * 50}{C.RESET}")
+        print(f"  {C.WHITE}Experience samples:{C.RESET}  {stats['total']}")
+        print(f"  {C.WHITE}Since last cycle:{C.RESET}    {stats['since_last_learn']}")
+        print(f"  {C.WHITE}GNN accuracy:{C.RESET}        {stats['gnn_accuracy']:.1%}")
+        print(f"  {C.WHITE}Learning cycles:{C.RESET}     {stats['learn_cycles']}")
+        print()
+
+        min_samples = 1 if args.force else args.min_samples
+        if stats['since_last_learn'] < min_samples:
+            print(f"  {C.ORANGE}Not enough new samples ({stats['since_last_learn']}/{min_samples}).{C.RESET}")
+            print(f"  {C.PURPLE_DIM}Use --force to learn anyway, or analyze more files first.{C.RESET}\n")
+            return
+
+        model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'checkpoints', 'best_model.pt')
+        learner = OnlineLearner(checkpoint_path=model_path, experience_store=store)
+
+        print(f"  {C.PURPLE}Fine-tuning GNN on {stats['since_last_learn']} new samples...{C.RESET}")
+        print(f"  {C.PURPLE_DIM}Epochs: {args.epochs} | LR: {args.lr} | EWC: enabled{C.RESET}")
+        print()
+
+        result = learner.fine_tune(epochs=args.epochs, lr=args.lr, min_samples=min_samples)
+
+        if "error" in result:
+            print(f"  {C.ORANGE}Error: {result['error']}{C.RESET}\n")
+            return
+
+        # Print training progress
+        for h in result.get("history", []):
+            val_str = f" | Val F1: {h['val_f1']:.3f}" if 'val_f1' in h else ""
+            print(f"  {C.GRAY}Epoch {h['epoch']:3d} | Train F1: {h['train_f1']:.3f}{val_str}{C.RESET}")
+
+        print(f"\n  {C.PURPLE_DIM}{'─' * 50}{C.RESET}")
+
+        if result["improved"]:
+            print(f"  {C.GREEN}Model improved!{C.RESET}")
+            print(f"  {C.WHITE}Baseline F1:{C.RESET}  {result['baseline_f1']:.3f}" if result['baseline_f1'] else "")
+            print(f"  {C.WHITE}New F1:{C.RESET}       {result['final_f1']:.3f}")
+            print(f"  {C.WHITE}Saved to:{C.RESET}     {result['model_saved']}")
+            print(f"  {C.PURPLE_DIM}Previous model backed up (use --rollback to restore){C.RESET}")
+        else:
+            print(f"  {C.ORANGE}No improvement — model unchanged{C.RESET}")
+            print(f"  {C.PURPLE_DIM}{result.get('rollback_reason', '')}{C.RESET}")
+        print()
+
+    elif args.command == 'experience':
+        from verifier.self_learn import ExperienceStore
+
+        store = ExperienceStore()
+
+        if args.clear:
+            import shutil
+            shutil.rmtree(store.store_dir, ignore_errors=True)
+            print(f"{C.GREEN}Experience cleared.{C.RESET}")
+            return
+
+        if args.export:
+            dataset = store.export_dataset()
+            with open(args.export, 'w') as f:
+                json.dump(dataset, f, indent=2)
+            print(f"{C.GREEN}Exported {len(dataset)} samples to {args.export}{C.RESET}")
+            return
+
+        stats = store.get_stats()
+        print(LOGO)
+        print(f"  {C.PURPLE_BOLD}Experience Store{C.RESET}")
+        print(f"  {C.PURPLE_DIM}{'─' * 50}{C.RESET}")
+        print(f"  {C.WHITE}Total samples:{C.RESET}      {stats['total']}")
+        print(f"  {C.WHITE}Buggy:{C.RESET}              {stats['buggy']}")
+        print(f"  {C.WHITE}Clean:{C.RESET}              {stats['clean']}")
+        print(f"  {C.WHITE}GNN accuracy:{C.RESET}       {stats['gnn_accuracy']:.1%}")
+        print(f"  {C.WHITE}Since last learn:{C.RESET}   {stats['since_last_learn']}")
+        print(f"  {C.WHITE}Learning cycles:{C.RESET}    {stats['learn_cycles']}")
+        print(f"  {C.WHITE}Store path:{C.RESET}         {store.store_dir}")
+
+        if store.should_learn():
+            print(f"\n  {C.PURPLE}Ready for self-learning! Run: {C.WHITE}sequent learn{C.RESET}")
+        print()
+
+    elif args.command == 'watch':
+        print(LOGO)
+        from verifier.watcher import FileWatcher, IncrementalAnalyzer, _cli_on_result
+
+        print(f"  {C.PURPLE_BOLD}Watch Mode{C.RESET}")
+        print(f"  {C.PURPLE_DIM}Watching: {', '.join(args.paths)}{C.RESET}")
+        print(f"  {C.PURPLE_DIM}Poll interval: {args.interval}s | Press Ctrl+C to stop{C.RESET}\n")
+
+        watcher = FileWatcher(
+            paths=args.paths,
+            poll_interval=args.interval,
+            on_result=_cli_on_result,
+        )
+        try:
+            watcher.watch()
+        except KeyboardInterrupt:
+            print(f"\n  {C.PURPLE_DIM}Watch stopped.{C.RESET}\n")
+
+    elif args.command == 'badge':
+        from verifier.badges import generate_summary_badge, generate_badge, save_badge
+
+        if not os.path.exists(args.file):
+            print(f"{C.ORANGE}Error: File not found: {args.file}{C.RESET}")
+            sys.exit(1)
+
+        with open(args.file) as f:
+            source = f.read()
+
+        try:
+            functions = extract_functions(source)
+        except SyntaxError as e:
+            print(f"{C.ORANGE}Syntax error in {args.file}: {e}{C.RESET}")
+            sys.exit(1)
+
+        model_path = None if args.no_gnn else os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'checkpoints', 'best_model.pt'
+        )
+        engine = SequentEngine(model_path=model_path, self_learn=False)
+
+        verified = 0
+        buggy = 0
+        total_time = 0.0
+
+        for name, func_source in functions:
+            result = engine.analyze(func_source, name)
+            total_time += result.total_time_ms
+            if result.consensus_buggy:
+                buggy += 1
+            else:
+                verified += 1
+
+        svg = generate_summary_badge(verified=verified, buggy=buggy, total_time_ms=total_time)
+        save_badge(svg, args.output)
+        print(f"{C.GREEN}Badge saved to {args.output}{C.RESET}")
+        print(f"  {C.PURPLE_DIM}{verified} verified, {buggy} bugs ({total_time:.0f}ms){C.RESET}")
+
+    elif args.command == 'lsp':
+        from lsp_server import serve_tcp, SequentLSPServer
+
+        if args.tcp:
+            serve_tcp(host=args.host, port=args.port)
+        else:
+            server = SequentLSPServer()
+            server.serve()
 
 
 if __name__ == '__main__':
