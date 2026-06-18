@@ -6,9 +6,14 @@
            |_|
 ```
 
+[![CI](https://github.com/devangpratap/sequent/actions/workflows/ci.yml/badge.svg)](https://github.com/devangpratap/sequent/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/sequent-verify)](https://pypi.org/project/sequent-verify/)
+[![Python](https://img.shields.io/pypi/pyversions/sequent-verify)](https://pypi.org/project/sequent-verify/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
+
 **Neural Formal Verification Engine** — GNN proposes, Z3 disposes.
 
-Sequent is a neurosymbolic Python debugger that **proves your code correct** — or finds the exact counterexample that breaks it.
+Sequent is a neurosymbolic code verifier for **Python and JavaScript/TypeScript** that **proves your code correct** — or finds the exact counterexample that breaks it.
 
 ## How it works
 
@@ -27,7 +32,7 @@ Python Source → AST Parser → GATv2 (10M params) → Bug Predictions
 ## Install
 
 ```bash
-pip install sequent
+pip install sequent-verify
 ```
 
 ## Usage
@@ -47,6 +52,20 @@ sequent check main.py --cert report.json
 
 # JSON output for CI
 sequent check main.py --json
+
+# Verify JavaScript/TypeScript
+sequent check app.js
+sequent check utils.ts -f calculateTotal
+
+# Watch mode (re-verify on save)
+sequent watch src/
+
+# Generate verification badge
+sequent badge main.py -o badge.svg
+
+# Start LSP server (for Neovim, Emacs, Helix, etc.)
+sequent lsp
+sequent lsp --tcp --port 2087
 ```
 
 ## Example
@@ -177,6 +196,40 @@ repos:
 ```
 
 The hook skips files over 10 KB for speed. To bypass on a single commit, use `git commit --no-verify`.
+
+## LSP Server
+
+Sequent ships an LSP server for editor-agnostic verification. Works with any LSP client.
+
+**Neovim** (via `lspconfig`):
+
+```lua
+vim.lsp.start({
+  name = "sequent",
+  cmd = { "sequent-lsp" },
+  filetypes = { "python", "javascript", "typescript" },
+})
+```
+
+**Helix** (`~/.config/helix/languages.toml`):
+
+```toml
+[[language]]
+name = "python"
+language-servers = ["sequent-lsp"]
+
+[language-server.sequent-lsp]
+command = "sequent-lsp"
+```
+
+**Emacs** (via `lsp-mode`):
+
+```elisp
+(lsp-register-client
+  (make-lsp-client :new-connection (lsp-stdio-connection "sequent-lsp")
+                   :major-modes '(python-mode js-mode typescript-mode)
+                   :server-id 'sequent))
+```
 
 ## GitHub Action
 

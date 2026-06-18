@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sequent-verify"
-version = "0.1.0"
+version = "0.2.0"
 description = "Neural Formal Verification Engine — GNN proposes, Z3 disposes"
 readme = "README.md"
 license = "MIT"
@@ -49,13 +49,14 @@ dev = [
 
 [project.scripts]
 sequent = "cli:main"
+sequent-lsp = "lsp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/devangpratapsingh/sequent"
 Repository = "https://github.com/devangpratapsingh/sequent"
 
 [tool.setuptools]
-py-modules = ["cli"]
+py-modules = ["cli", "lsp_server"]
 
 [tool.setuptools.packages.find]
 include = ["model*", "verifier*", "backend*", "dataset*", "benchmark*"]

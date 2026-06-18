@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model.ast_to_graph import code_to_graph, ASTGraphBuilder, NUM_NODE_TYPES
 from model.gnn import SequentGNN
 from verifier.z3_engine import Z3Verifier, VerificationReport, VerificationResult
+from verifier.js_verifier import JSVerifier
 
 
 @dataclass
@@ -116,6 +117,7 @@ class SequentEngine:
         )
         self.model = None
         self.verifier = Z3Verifier(timeout_ms=5000)
+        self.js_verifier = JSVerifier(timeout_ms=5000)
 
         # Self-learning: collect experience from every analysis run
         self.experience_store = None
@@ -218,6 +220,103 @@ class SequentEngine:
                 pass  # never let self-learning break the main pipeline
 
         return result
+
+    def analyze_js(self, code: str, function_name: str = "") -> SequentResult:
+        """Run the verification pipeline on JavaScript/TypeScript code.
+
+        Uses the JS CPG builder for GNN inference and the JS Z3 verifier
+        for property checking. Same consensus logic as Python analysis.
+        """
+        code = textwrap.dedent(code).strip()
+        result = SequentResult(code=code, function_name=function_name)
+        t0 = time.time()
+
+        # Stage 1: GNN prediction (using JS graph builder)
+        if self.model is not None:
+            result.gnn_prediction = self._gnn_predict_js(code)
+
+        # Stage 2: Z3 verification (JS-specific property checks)
+        result.verification = self.js_verifier.verify(code, function_name)
+
+        # Stage 3: Consensus (same logic as Python)
+        gnn_says_buggy = result.gnn_prediction.is_buggy if result.gnn_prediction else False
+        z3_says_buggy = result.verification.has_bugs
+
+        if gnn_says_buggy and z3_says_buggy:
+            result.consensus_buggy = True
+            result.consensus_description = (
+                f"BUG CONFIRMED: GNN detected bug (confidence: "
+                f"{result.gnn_prediction.buggy_confidence:.1%}) and Z3 produced "
+                f"a formal counterexample."
+            )
+        elif z3_says_buggy and not gnn_says_buggy:
+            result.consensus_buggy = True
+            result.consensus_description = (
+                "BUG FOUND by Z3 (GNN missed it). Formal counterexample proves the bug exists."
+            )
+        elif gnn_says_buggy and not z3_says_buggy:
+            gnn_conf = result.gnn_prediction.buggy_confidence
+            result.consensus_buggy = False
+            result.consensus_description = (
+                f"GNN flagged potential bug (confidence: {gnn_conf:.1%}) "
+                f"but Z3 could not confirm."
+            )
+        else:
+            result.consensus_buggy = False
+            result.consensus_description = "VERIFIED: Both GNN and Z3 agree — no bugs detected."
+
+        result.total_time_ms = (time.time() - t0) * 1000
+        return result
+
+    @torch.no_grad()
+    def _gnn_predict_js(self, code: str) -> GNNPrediction:
+        """Run GNN inference on JS/TS code using the JS CPG builder."""
+        t0 = time.time()
+        try:
+            from model.ts_to_graph import js_code_to_graph
+            graph = js_code_to_graph(code, bug_line=None, is_buggy=False)
+        except Exception:
+            return GNNPrediction(
+                is_buggy=False, buggy_confidence=0.0,
+                inference_time_ms=(time.time() - t0) * 1000,
+            )
+
+        if graph is None:
+            return GNNPrediction(
+                is_buggy=False, buggy_confidence=0.0,
+                inference_time_ms=(time.time() - t0) * 1000,
+            )
+
+        x = graph['x'].to(self.device)
+        edge_index = graph['edge_index'].to(self.device)
+        edge_type = graph['edge_type'].to(self.device) if 'edge_type' in graph else None
+
+        graph_pred, node_pred, _, _ = self.model(x, edge_index, edge_type=edge_type)
+
+        buggy_prob = graph_pred.item()
+        node_scores = node_pred.squeeze().cpu().numpy().tolist()
+        if isinstance(node_scores, float):
+            node_scores = [node_scores]
+
+        node_lines = graph.get('node_lines', [])
+        bug_lines = []
+        threshold = 0.5
+        line_scores = {}
+        for score, line in zip(node_scores, node_lines):
+            if line > 0:
+                line_scores[line] = max(line_scores.get(line, 0), score)
+        bug_lines = sorted(
+            [l for l in line_scores if line_scores[l] > threshold],
+            key=lambda l: line_scores[l], reverse=True,
+        )
+
+        return GNNPrediction(
+            is_buggy=buggy_prob > 0.5,
+            buggy_confidence=buggy_prob,
+            bug_lines=bug_lines[:5],
+            node_scores=node_scores,
+            inference_time_ms=(time.time() - t0) * 1000,
+        )
 
     @torch.no_grad()
     def _gnn_predict(self, code: str) -> GNNPrediction:

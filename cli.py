@@ -52,6 +52,52 @@ LOGO = f"""{C.PURPLE_BOLD}
 """
 
 
+def extract_js_functions(source: str) -> list[tuple[str, str]]:
+    """Extract (name, source) pairs for JS/TS functions using regex."""
+    import re
+    functions = []
+    lines = source.split('\n')
+
+    # Match function declarations and arrow functions
+    func_re = re.compile(
+        r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\("
+    )
+    arrow_re = re.compile(
+        r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(.*?\)\s*=>"
+    )
+
+    i = 0
+    while i < len(lines):
+        m = func_re.match(lines[i]) or arrow_re.match(lines[i])
+        if m:
+            name = m.group(1)
+            start = i
+            # Find the end of the function by tracking braces
+            brace_count = 0
+            found_open = False
+            end = i
+            for j in range(i, len(lines)):
+                for ch in lines[j]:
+                    if ch == '{':
+                        brace_count += 1
+                        found_open = True
+                    elif ch == '}':
+                        brace_count -= 1
+                if found_open and brace_count <= 0:
+                    end = j
+                    break
+            else:
+                end = len(lines) - 1
+
+            func_source = '\n'.join(lines[start:end + 1])
+            functions.append((name, func_source))
+            i = end + 1
+        else:
+            i += 1
+
+    return functions
+
+
 def extract_functions(source: str) -> list[tuple[str, str]]:
     """Extract (name, source) pairs for all top-level functions."""
     tree = ast.parse(source)
@@ -196,8 +242,8 @@ def main():
     )
     sub = parser.add_subparsers(dest='command')
 
-    check_parser = sub.add_parser('check', help='Analyze a Python file')
-    check_parser.add_argument('file', help='Python file to analyze')
+    check_parser = sub.add_parser('check', help='Analyze a Python/JS/TS file')
+    check_parser.add_argument('file', help='Python, JavaScript, or TypeScript file to analyze')
     check_parser.add_argument('-f', '--function', help='Analyze only this function')
     check_parser.add_argument('--json', action='store_true', help='Output raw JSON')
     check_parser.add_argument('--cert', metavar='FILE', help='Export proof certificate to FILE')
@@ -253,12 +299,18 @@ def main():
         if not args.json:
             print(LOGO)
 
-        # Extract functions
-        try:
-            functions = extract_functions(source)
-        except SyntaxError as e:
-            print(f"{C.ORANGE}Syntax error in {args.file}: {e}{C.RESET}")
-            sys.exit(1)
+        # Detect language from file extension
+        ext = os.path.splitext(args.file)[1].lower()
+        is_js = ext in ('.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs')
+
+        if is_js:
+            functions = extract_js_functions(source)
+        else:
+            try:
+                functions = extract_functions(source)
+            except SyntaxError as e:
+                print(f"{C.ORANGE}Syntax error in {args.file}: {e}{C.RESET}")
+                sys.exit(1)
 
         if not functions:
             print(f"{C.PURPLE_DIM}No functions found in {args.file}{C.RESET}")
@@ -277,15 +329,20 @@ def main():
         )
         engine = SequentEngine(model_path=model_path, self_learn=not args.no_learn)
 
+        lang_label = 'JS/TS' if is_js else 'Python'
         if not args.json:
             print(f"  {C.PURPLE_DIM}Analyzing {len(functions)} function(s) in {C.WHITE}{args.file}{C.RESET}")
+            print(f"  {C.PURPLE_DIM}Language: {C.PURPLE}{lang_label}{C.RESET}")
             print(f"  {C.PURPLE_DIM}Engine: {C.PURPLE}{'GNN + Z3' if engine.model else 'Z3 only'}{C.RESET}")
             print(f"  {C.PURPLE_DIM}Device: {C.PURPLE}{engine.device}{C.RESET}")
 
         # Analyze
         results = []
         for name, func_source in functions:
-            result = engine.analyze(func_source, name)
+            if is_js:
+                result = engine.analyze_js(func_source, name)
+            else:
+                result = engine.analyze(func_source, name)
             results.append(result)
 
             if not args.json:
