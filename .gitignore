@@ -7,3 +7,5 @@ build/
 dataset/generated/
 node_modules/
 checkpoints/*.pt
+.pytest_cache/
+*.vsix
