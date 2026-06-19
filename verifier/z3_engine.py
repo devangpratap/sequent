@@ -1272,8 +1272,12 @@ class Z3Verifier:
             if not sym_state.divisions and not sym_state.array_accesses:
                 return checks
 
-        # --- Division by zero ---
+        # --- Division by zero (deduplicate by line) ---
+        seen_div_lines: set[int] = set()
         for divisor_expr, line in sym_state.divisions:
+            if line in seen_div_lines:
+                continue
+            seen_div_lines.add(line)
             try:
                 solver = z3.Solver()
                 solver.set("timeout", self.timeout_ms)
@@ -1307,8 +1311,12 @@ class Z3Verifier:
             except Exception:
                 pass
 
-        # --- Array bounds ---
+        # --- Array bounds (deduplicate by array+line) ---
+        seen_arr_checks: set[tuple[str, int]] = set()
         for arr_name, index_expr, line in sym_state.array_accesses:
+            if (arr_name, line) in seen_arr_checks:
+                continue
+            seen_arr_checks.add((arr_name, line))
             try:
                 len_var_name = f"len_{arr_name}"
                 if len_var_name in sym_state.variables:
