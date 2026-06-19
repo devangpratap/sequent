@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sequent-verify"
 version = "0.2.0"
-description = "Neural Formal Verification Engine — GNN proposes, Z3 disposes"
+description = "Neurosymbolic code verifier: GATv2 GNN + Z3 SMT solver for Python and JS/TS"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"

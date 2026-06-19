@@ -175,7 +175,7 @@ def generate_certificate(results: list, filepath: str, source_file: str):
     from verifier.z3_engine import VerificationResult
 
     cert = {
-        "sequent_version": "0.1.0",
+        "sequent_version": "0.2.0",
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source_file": os.path.abspath(source_file),
         "summary": {

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="520" font-family="'SFMono-Regular','Menlo','Monaco','Consolas','Liberation Mono','Courier New',monospace" font-size="13">
+  <defs>
+    <style>
+      .bg { fill: #0d0d0d; }
+      .title-bar { fill: #1a1a2e; }
+      .btn-r { fill: #ff5f57; }
+      .btn-y { fill: #febc2e; }
+      .btn-g { fill: #28c840; }
+      .cmd { fill: #a0a0a0; }
+      .prompt { fill: #7c3aed; }
+      .fn-name { fill: #ffffff; font-weight: bold; }
+      .bug { fill: #f97316; font-weight: bold; }
+      .ok { fill: #22c55e; }
+      .dim { fill: #6b7280; }
+      .purple { fill: #a78bfa; }
+      .rule { fill: #4c3a6e; }
+      .white { fill: #e5e7eb; }
+      .counter { fill: #f97316; }
+    </style>
+  </defs>
+
+  <!-- Terminal window -->
+  <rect class="bg" width="720" height="520" rx="10"/>
+  <rect class="title-bar" width="720" height="36" rx="10"/>
+  <rect class="bg" y="26" width="720" height="10"/>
+  <circle class="btn-r" cx="20" cy="18" r="6"/>
+  <circle class="btn-y" cx="40" cy="18" r="6"/>
+  <circle class="btn-g" cx="60" cy="18" r="6"/>
+  <text x="320" y="22" text-anchor="middle" class="dim" font-size="12">sequent</text>
+
+  <!-- Command -->
+  <text x="16" y="60" class="prompt">$</text>
+  <text x="28" y="60" class="cmd"> sequent check example.py -v</text>
+
+  <!-- Function 1: divide — BUG -->
+  <text x="16" y="92" class="fn-name">  divide</text>
+  <text x="90" y="92" class="bug">  ✗ BUG DETECTED</text>
+  <text x="260" y="92" class="dim">(84ms)</text>
+  <line x1="16" y1="100" x2="520" y2="100" stroke="#4c3a6e" stroke-width="1"/>
+
+  <text x="16" y="118" class="purple">  Z3</text>
+  <text x="50" y="118" class="counter">  ✗ counterexample</text>
+  <text x="230" y="118" class="dim">76ms</text>
+
+  <text x="36" y="138" class="ok">  ✓</text>
+  <text x="56" y="138" class="dim">bounds_check</text>
+  <text x="36" y="156" class="counter">  ✗</text>
+  <text x="56" y="156" class="white">none_safety: Parameter 'a' used without None check</text>
+  <text x="56" y="172" class="counter">    ↳ counterexample: {"param": "a", "value": "None"}</text>
+  <text x="36" y="192" class="counter">  ✗</text>
+  <text x="56" y="192" class="white">division_safety: Possible division by zero at line 2</text>
+  <text x="56" y="208" class="counter">    ↳ counterexample: {"b": 0}</text>
+  <text x="36" y="228" class="ok">  ✓</text>
+  <text x="56" y="228" class="dim">return_completeness, index_bounds, loop_safety, dead_code</text>
+
+  <line x1="16" y1="238" x2="520" y2="238" stroke="#4c3a6e" stroke-width="1"/>
+  <text x="16" y="256" class="purple">  Consensus:</text>
+  <text x="110" y="256" class="white"> BUG FOUND by Z3. Formal counterexample proves the bug.</text>
+
+  <text x="16" y="280" class="bug">  ⚡ REPAIR</text>
+  <text x="100" y="280" class="dim"> Added None guard + division-by-zero check</text>
+  <text x="36" y="300" class="ok">  def divide(a, b):</text>
+  <text x="36" y="316" class="ok">      if a is None or b is None or b == 0:</text>
+  <text x="36" y="332" class="ok">          return None</text>
+  <text x="36" y="348" class="ok">      return a / b</text>
+
+  <!-- Function 2: safe_divide — VERIFIED -->
+  <text x="16" y="382" class="fn-name">  safe_divide</text>
+  <text x="120" y="382" class="ok">  ✓ VERIFIED</text>
+  <text x="240" y="382" class="dim">(3ms)</text>
+  <line x1="16" y1="390" x2="520" y2="390" stroke="#4c3a6e" stroke-width="1"/>
+
+  <text x="16" y="408" class="purple">  Z3</text>
+  <text x="50" y="408" class="ok">  ✓ verified</text>
+  <text x="160" y="408" class="dim">3ms</text>
+
+  <text x="36" y="428" class="ok">  ✓</text>
+  <text x="56" y="428" class="dim">bounds_check, none_safety, return_completeness</text>
+  <text x="36" y="446" class="ok">  ✓</text>
+  <text x="56" y="446" class="dim">arithmetic_safety, index_bounds, loop_safety, dead_code</text>
+  <text x="36" y="464" class="ok">  ✓</text>
+  <text x="56" y="464" class="dim">operator_consistency, sym_division_by_zero</text>
+
+  <line x1="16" y1="474" x2="520" y2="474" stroke="#4c3a6e" stroke-width="1"/>
+  <text x="16" y="492" class="purple">  Consensus:</text>
+  <text x="110" y="492" class="white"> VERIFIED: Both GNN and Z3 agree — no bugs detected.</text>
+</svg>
