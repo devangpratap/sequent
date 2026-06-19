@@ -298,14 +298,14 @@ def bad_recurse(n):
 # ---------- Improved None Safety ----------
 
 def test_none_safety_arithmetic_use(verifier):
-    """Parameter used in arithmetic without None guard should be flagged."""
+    """Pure arithmetic use without subscript/method/len should NOT flag none_safety."""
     code = """
 def double(x):
     return x * 2
 """
     report = verifier.verify(code, "double")
     none_checks = [c for c in report.checks if c.property_name == "none_safety"]
-    assert any(c.result == VerificationResult.COUNTEREXAMPLE for c in none_checks)
+    assert all(c.result == VerificationResult.VERIFIED for c in none_checks)
 
 
 def test_none_safety_guarded_arithmetic(verifier):

@@ -121,7 +121,7 @@ class Z3Verifier:
 
         # Determine overall result
         # Informational checks (sym_overflow) do not block VERIFIED.
-        _info_checks = {"sym_overflow"}
+        _info_checks = {"sym_overflow", "sym_none_return"}
         decisive = [c for c in report.checks if c.property_name not in _info_checks]
         if report.has_bugs:
             report.overall_result = VerificationResult.COUNTEREXAMPLE
@@ -299,31 +299,6 @@ class Z3Verifier:
                                 counterexample={"param": param_name, "value": "None"},
                                 time_ms=(time.time() - t0) * 1000,
                             ))
-
-        # Z3-backed: for params used in arithmetic (BinOp), verify they can be None
-        for node in ast.walk(func_def):
-            if isinstance(node, ast.BinOp):
-                for operand in [node.left, node.right]:
-                    if isinstance(operand, ast.Name) and operand.id in params:
-                        param_name = operand.id
-                        if param_name not in guarded_params and param_name not in flagged_params:
-                            # Z3 check: param is unconstrained, so None is possible
-                            solver = z3.Solver()
-                            solver.set("timeout", self.timeout_ms)
-                            p = z3.Int(param_name)
-                            # With no constraints, param can be anything (including None in Python)
-                            # We add True and check sat to confirm unconstrained
-                            solver.add(z3.BoolVal(True))
-                            if solver.check() == z3.sat:
-                                flagged_params.add(param_name)
-                                checks.append(PropertyCheck(
-                                    property_name="none_safety",
-                                    result=VerificationResult.COUNTEREXAMPLE,
-                                    description=f"Parameter '{param_name}' used in arithmetic without None check at line {operand.lineno}",
-                                    line=operand.lineno,
-                                    counterexample={"param": param_name, "value": "None"},
-                                    time_ms=(time.time() - t0) * 1000,
-                                ))
 
         if not checks:
             checks.append(PropertyCheck(
@@ -522,10 +497,94 @@ class Z3Verifier:
 
         return checks
 
+    @staticmethod
+    def _extract_index_constraints(func_def: ast.FunctionDef) -> tuple[list, dict]:
+        """Extract assignment constraints and array-length bindings from function body.
+
+        Returns (constraints, z3_vars) where constraints are Z3 expressions that
+        relate variables to each other (e.g. high = len(arr) - 1, mid = (low+high)//2)
+        and z3_vars maps variable names to Z3 Int variables.
+        """
+        z3_vars: dict = {}
+        constraints = []
+        arr_len_bindings: dict[str, str] = {}  # var_name -> arr_name (for len() calls)
+
+        def get_var(name: str):
+            if name not in z3_vars:
+                z3_vars[name] = z3.Int(name)
+            return z3_vars[name]
+
+        for node in ast.walk(func_def):
+            if not isinstance(node, ast.Assign):
+                continue
+            if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+                continue
+            target_name = node.targets[0].id
+            val = node.value
+
+            # Pattern: x = 0 or x = constant
+            if isinstance(val, ast.Constant) and isinstance(val.value, int):
+                constraints.append(get_var(target_name) == val.value)
+
+            # Pattern: x = len(arr) - 1
+            elif (isinstance(val, ast.BinOp) and isinstance(val.op, ast.Sub)
+                  and isinstance(val.right, ast.Constant) and val.right.value == 1
+                  and isinstance(val.left, ast.Call)
+                  and isinstance(val.left.func, ast.Name) and val.left.func.id == 'len'
+                  and len(val.left.args) == 1 and isinstance(val.left.args[0], ast.Name)):
+                arr_name = val.left.args[0].id
+                arr_len = get_var(f'__len_{arr_name}')
+                constraints.append(get_var(target_name) == arr_len - 1)
+                constraints.append(arr_len >= 0)
+                arr_len_bindings[target_name] = arr_name
+
+            # Pattern: x = (a + b) // 2
+            elif (isinstance(val, ast.BinOp) and isinstance(val.op, ast.FloorDiv)
+                  and isinstance(val.right, ast.Constant) and val.right.value == 2
+                  and isinstance(val.left, ast.BinOp) and isinstance(val.left.op, ast.Add)
+                  and isinstance(val.left.left, ast.Name) and isinstance(val.left.right, ast.Name)):
+                a = get_var(val.left.left.id)
+                b = get_var(val.left.right.id)
+                # mid = (a + b) / 2, so mid >= min(a,b) and mid <= max(a,b)
+                mid = get_var(target_name)
+                constraints.append(mid >= 0)
+                constraints.append(mid * 2 <= a + b)
+                constraints.append(mid * 2 >= a + b - 1)
+
+            # Pattern: x = y + c or x = y - c
+            elif (isinstance(val, ast.BinOp)
+                  and isinstance(val.left, ast.Name) and isinstance(val.right, ast.Constant)
+                  and isinstance(val.right.value, int)):
+                lhs = get_var(val.left.id)
+                c = val.right.value
+                if isinstance(val.op, ast.Add):
+                    constraints.append(get_var(target_name) == lhs + c)
+                elif isinstance(val.op, ast.Sub):
+                    constraints.append(get_var(target_name) == lhs - c)
+
+        # Extract loop conditions (while low <= high, while low < high)
+        for node in ast.walk(func_def):
+            if not isinstance(node, ast.While):
+                continue
+            test = node.test
+            if isinstance(test, ast.Compare) and len(test.ops) == 1 and len(test.comparators) == 1:
+                if isinstance(test.left, ast.Name) and isinstance(test.comparators[0], ast.Name):
+                    left = get_var(test.left.id)
+                    right = get_var(test.comparators[0].id)
+                    if isinstance(test.ops[0], (ast.Lt, ast.LtE)):
+                        constraints.append(left <= right)
+                    elif isinstance(test.ops[0], (ast.Gt, ast.GtE)):
+                        constraints.append(left >= right)
+
+        return constraints, z3_vars, arr_len_bindings
+
     def _check_array_index_bounds(self, func_def: ast.FunctionDef, code: str) -> list[PropertyCheck]:
-        """Check array index accesses are within bounds using Z3 symbolic execution."""
+        """Check array index accesses are within bounds using Z3 with full context."""
         checks = []
         t0 = time.time()
+
+        # Extract constraints from assignments and loops
+        constraints, z3_vars, arr_len_bindings = self._extract_index_constraints(func_def)
 
         # Collect all subscript accesses with variable indices
         for node in ast.walk(func_def):
@@ -554,35 +613,46 @@ class Z3Verifier:
             if index_expr is None:
                 continue
 
-            # Use Z3 to check if index can go out of bounds
+            # Build solver with full function context
             solver = z3.Solver()
             solver.set("timeout", self.timeout_ms)
 
-            n = z3.Int('__arr_len')
-            solver.add(n >= 0)  # array length is non-negative
+            # Array length variable
+            arr_len_var = f'__len_{arr_name}'
+            if arr_len_var not in z3_vars:
+                z3_vars[arr_len_var] = z3.Int(arr_len_var)
+            n = z3_vars[arr_len_var]
+            solver.add(n >= 0)
+
+            # Add all extracted constraints
+            for c in constraints:
+                solver.add(c)
 
             # Parse the index expression
             if '+' in index_expr:
                 parts = index_expr.split('+')
-                idx_var = z3.Int(parts[0])
+                if parts[0] not in z3_vars:
+                    z3_vars[parts[0]] = z3.Int(parts[0])
+                idx_var = z3_vars[parts[0]]
                 offset = int(parts[1])
                 idx = idx_var + offset
             elif '-' in index_expr and not index_expr.startswith('-'):
                 parts = index_expr.split('-')
-                idx_var = z3.Int(parts[0])
+                if parts[0] not in z3_vars:
+                    z3_vars[parts[0]] = z3.Int(parts[0])
+                idx_var = z3_vars[parts[0]]
                 offset = int(parts[1])
                 idx = idx_var - offset
             else:
-                idx_var = z3.Int(index_expr)
+                if index_expr not in z3_vars:
+                    z3_vars[index_expr] = z3.Int(index_expr)
+                idx_var = z3_vars[index_expr]
                 idx = idx_var
 
             # Check: can index >= n (upper bound violation)?
             solver.push()
-            solver.add(idx_var >= 0)  # assume loop variable is non-negative
             solver.add(n > 0)  # non-empty array
             solver.add(idx >= n)
-            # Add reasonable bounds for loop variable
-            solver.add(idx_var < n + 5)
 
             if solver.check() == z3.sat:
                 model = solver.model()
@@ -606,7 +676,6 @@ class Z3Verifier:
             solver.push()
             solver.add(n > 0)
             solver.add(idx < 0)
-            solver.add(idx_var < n)
 
             if solver.check() == z3.sat:
                 model = solver.model()
@@ -1072,12 +1141,12 @@ class Z3Verifier:
         """Verify array access in comparison is bounds-safe.
 
         When a comparison involves array subscript access (e.g., arr[i] > arr[j]),
-        verify that both indices are within bounds using Z3 constraints.
+        verify that both indices are within bounds using Z3 constraints from the
+        full function context (assignments, loop conditions).
         """
         t0 = time.time()
 
         subscripts = []
-        # Collect subscript nodes from comparison
         for node in [comp_node.left] + comp_node.comparators:
             if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
                 subscripts.append(node)
@@ -1085,23 +1154,38 @@ class Z3Verifier:
         if not subscripts:
             return None
 
+        # Extract full function context
+        fn_constraints, z3_vars, _ = self._extract_index_constraints(func_def)
+
         solver = z3.Solver()
         solver.set("timeout", self.timeout_ms)
 
-        n = z3.Int('__arr_len')
-        solver.add(n > 0)  # non-empty array
+        # Add all function context constraints
+        for c in fn_constraints:
+            solver.add(c)
 
         idx_vars = []
         for sub in subscripts:
             arr_name = sub.value.id
             sl = sub.slice
 
+            # Get or create array length variable
+            arr_len_var = f'__len_{arr_name}'
+            if arr_len_var not in z3_vars:
+                z3_vars[arr_len_var] = z3.Int(arr_len_var)
+            n = z3_vars[arr_len_var]
+            solver.add(n > 0)
+
             if isinstance(sl, ast.Name):
-                idx = z3.Int(sl.id)
-                idx_vars.append((sl.id, idx, arr_name))
+                if sl.id not in z3_vars:
+                    z3_vars[sl.id] = z3.Int(sl.id)
+                idx = z3_vars[sl.id]
+                idx_vars.append((sl.id, idx, arr_name, n))
             elif isinstance(sl, ast.BinOp):
                 if isinstance(sl.left, ast.Name) and isinstance(sl.right, ast.Constant):
-                    base = z3.Int(sl.left.id)
+                    if sl.left.id not in z3_vars:
+                        z3_vars[sl.left.id] = z3.Int(sl.left.id)
+                    base = z3_vars[sl.left.id]
                     val = sl.right.value
                     if isinstance(val, int):
                         if isinstance(sl.op, ast.Add):
@@ -1110,20 +1194,14 @@ class Z3Verifier:
                             idx = base - val
                         else:
                             continue
-                        idx_vars.append((f"{sl.left.id}{'+' if isinstance(sl.op, ast.Add) else '-'}{val}", idx, arr_name))
+                        idx_vars.append((f"{sl.left.id}{'+' if isinstance(sl.op, ast.Add) else '-'}{val}", idx, arr_name, n))
 
         if not idx_vars:
             return None
 
-        # Check if any index can go out of bounds
-        for idx_name, idx_expr, arr_name in idx_vars:
+        for idx_name, idx_expr, arr_name, n in idx_vars:
             solver.push()
-            # Index out of upper bound
             solver.add(z3.Or(idx_expr >= n, idx_expr < 0))
-            # Assume reasonable ranges for loop variables
-            for _, other_idx, _ in idx_vars:
-                # Allow the index to be anything -- we're checking if OOB is possible
-                pass
 
             if solver.check() == z3.sat:
                 model = solver.model()
@@ -1433,8 +1511,8 @@ class Z3Verifier:
                             ce[d.name()] = str(model[d])
                         checks.append(PropertyCheck(
                             property_name="sym_none_return",
-                            result=VerificationResult.COUNTEREXAMPLE,
-                            description="Function can return None on some paths",
+                            result=VerificationResult.UNKNOWN,
+                            description="Function may return None on some paths (warning)",
                             counterexample=ce,
                             time_ms=(time.time() - t0) * 1000,
                         ))
