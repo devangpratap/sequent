@@ -1,9 +1,42 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
 
 const NAV_ITEMS = [
   { to: '/playground', label: 'Playground' },
   { to: '/docs', label: 'Docs' },
 ]
+
+function DotMatrix() {
+  const glowRef = useRef(null)
+
+  useEffect(() => {
+    const el = glowRef.current
+    if (!el) return
+    let raf = 0
+    const onMove = (e) => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        el.style.setProperty('--mx', `${e.clientX}px`)
+        el.style.setProperty('--my', `${e.clientY}px`)
+        el.style.setProperty('--glow', '1')
+      })
+    }
+    const onLeave = () => el.style.setProperty('--glow', '0')
+    window.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseleave', onLeave)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseleave', onLeave)
+      cancelAnimationFrame(raf)
+    }
+  }, [])
+
+  return (
+    <div className="dot-matrix" aria-hidden="true">
+      <div ref={glowRef} className="dot-matrix-glow" />
+    </div>
+  )
+}
 
 function GitHubIcon() {
   return (
@@ -16,18 +49,21 @@ function GitHubIcon() {
 export default function Layout() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <DotMatrix />
       <header style={{ borderBottom: '1px solid var(--border)', padding: '0.75rem 1.5rem', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '72rem', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <NavLink to="/" style={{ textDecoration: 'none', textShadow: 'none' }}>
+            <NavLink to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', textShadow: 'none' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" strokeWidth="2.4" strokeLinecap="round" aria-label="sequent" role="img">
+                <path d="M8 4V20" stroke="var(--accent-4)" />
+                <path d="M8 12H18" stroke="var(--accent-5)" />
+              </svg>
               <span style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '0.85rem',
+                fontSize: '0.95rem',
                 fontWeight: 700,
-                background: 'linear-gradient(90deg, var(--accent-4), var(--accent-5))',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                letterSpacing: '0.04em',
+                color: 'var(--text-primary)',
               }}>
                 sequent
               </span>
@@ -45,7 +81,7 @@ export default function Layout() {
             </nav>
           </div>
           <a
-            href="https://github.com/devangpratapsingh/sequent"
+            href="https://github.com/devangpratap/sequent"
             target="_blank"
             rel="noopener noreferrer"
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)', textDecoration: 'none', textShadow: 'none', transition: 'color 0.15s' }}
@@ -63,7 +99,7 @@ export default function Layout() {
       <footer style={{ borderTop: '1px solid var(--border)', padding: '0.75rem 1.5rem', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '72rem', margin: '0 auto', textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>
           sequent {'  \u00B7  '} MIT {'  \u00B7  '}
-          <a href="https://github.com/devangpratapsingh/sequent" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textShadow: 'none' }}>github</a>
+          <a href="https://github.com/devangpratap/sequent" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textShadow: 'none' }}>github</a>
           {'  \u00B7  '}
           <NavLink to="/docs" style={{ color: 'var(--text-muted)', textShadow: 'none' }}>docs</NavLink>
           {'  \u00B7  '} built by devang

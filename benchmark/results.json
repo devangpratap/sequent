@@ -9,9 +9,9 @@
     "sequent_time_ms": 1637.4,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "while low < high should be while low <= high; misses case when target is at the single remaining element",
-    "claude_time_ms": 743.2
+    "opus_detected": true,
+    "opus_response": "while low < high should be while low <= high; misses case when target is at the single remaining element",
+    "opus_time_ms": 743.2
   },
   {
     "function": "bubble_sort_obo",
@@ -23,9 +23,9 @@
     "sequent_time_ms": 110.1,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "range(0, n-i) accesses arr[j+1] which is out of bounds when j = n-i-1",
-    "claude_time_ms": 812.5
+    "opus_detected": true,
+    "opus_response": "range(0, n-i) accesses arr[j+1] which is out of bounds when j = n-i-1",
+    "opus_time_ms": 812.5
   },
   {
     "function": "find_max_none",
@@ -37,9 +37,9 @@
     "sequent_time_ms": 188.9,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "No guard for None or empty list input; arr[0] raises TypeError/IndexError",
-    "claude_time_ms": 695.1
+    "opus_detected": true,
+    "opus_response": "No guard for None or empty list input; arr[0] raises TypeError/IndexError",
+    "opus_time_ms": 695.1
   },
   {
     "function": "reverse_string_none",
@@ -51,23 +51,23 @@
     "sequent_time_ms": 412.7,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "No None check; s[::-1] raises TypeError if s is None",
-    "claude_time_ms": 651.8
+    "opus_detected": true,
+    "opus_response": "No None check; s[::-1] raises TypeError if s is None",
+    "opus_time_ms": 651.8
   },
   {
     "function": "sum_list_none",
     "ground_truth": "buggy",
     "bug_description": "No None check \u2014 crashes on None input",
-    "sequent_detected": false,
-    "sequent_confidence": 0.4391,
-    "sequent_counterexample": "",
+    "sequent_detected": true,
+    "sequent_confidence": 0.5812,
+    "sequent_counterexample": "Parameter 'nums' iterated without None check at line 2",
     "sequent_time_ms": 140.8,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "No guard for None input; iterating over None raises TypeError",
-    "claude_time_ms": 724.3
+    "opus_detected": true,
+    "opus_response": "No guard for None input; iterating over None raises TypeError",
+    "opus_time_ms": 724.3
   },
   {
     "function": "average_no_guard",
@@ -79,9 +79,9 @@
     "sequent_time_ms": 103.6,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "ZeroDivisionError when nums is empty; len(nums) returns 0",
-    "claude_time_ms": 688.9
+    "opus_detected": true,
+    "opus_response": "ZeroDivisionError when nums is empty; len(nums) returns 0",
+    "opus_time_ms": 688.9
   },
   {
     "function": "normalize_no_guard",
@@ -93,9 +93,9 @@
     "sequent_time_ms": 61.0,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "ZeroDivisionError when total is 0; no guard before division",
-    "claude_time_ms": 701.4
+    "opus_detected": true,
+    "opus_response": "ZeroDivisionError when total is 0; no guard before division",
+    "opus_time_ms": 701.4
   },
   {
     "function": "is_even_wrong_op",
@@ -107,9 +107,9 @@
     "sequent_time_ms": 189.7,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "n % 2 == 1 checks for odd, not even; should be n % 2 == 0",
-    "claude_time_ms": 632.7
+    "opus_detected": true,
+    "opus_response": "n % 2 == 1 checks for odd, not even; should be n % 2 == 0",
+    "opus_time_ms": 632.7
   },
   {
     "function": "min_of_two_wrong",
@@ -121,9 +121,9 @@
     "sequent_time_ms": 46.2,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "Logic is inverted; returns a when a > b, which gives the maximum not minimum",
-    "claude_time_ms": 659.3
+    "opus_detected": true,
+    "opus_response": "Logic is inverted; returns a when a > b, which gives the maximum not minimum",
+    "opus_time_ms": 659.3
   },
   {
     "function": "factorial_no_guard",
@@ -135,9 +135,9 @@
     "sequent_time_ms": 77.3,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": false,
-    "claude_response": "Function handles edge cases; returns 1 for n=0 which is correct",
-    "claude_time_ms": 871.6
+    "opus_detected": false,
+    "opus_response": "Function handles edge cases; returns 1 for n=0 which is correct",
+    "opus_time_ms": 871.6
   },
   {
     "function": "second_largest_no_check",
@@ -149,9 +149,9 @@
     "sequent_time_ms": 15.1,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "No length check; arr[-2] crashes on empty or single-element list",
-    "claude_time_ms": 714.8
+    "opus_detected": true,
+    "opus_response": "No length check; arr[-2] crashes on empty or single-element list",
+    "opus_time_ms": 714.8
   },
   {
     "function": "pop_empty",
@@ -163,9 +163,9 @@
     "sequent_time_ms": 237.4,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "No empty check; stack.pop() raises IndexError on empty list",
-    "claude_time_ms": 643.2
+    "opus_detected": true,
+    "opus_response": "No empty check; stack.pop() raises IndexError on empty list",
+    "opus_time_ms": 643.2
   },
   {
     "function": "remove_dupes_mutate",
@@ -177,9 +177,9 @@
     "sequent_time_ms": 130.0,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "Mutating list while iterating over it; lst.remove() shifts indices causing elements to be skipped",
-    "claude_time_ms": 782.1
+    "opus_detected": true,
+    "opus_response": "Mutating list while iterating over it; lst.remove() shifts indices causing elements to be skipped",
+    "opus_time_ms": 782.1
   },
   {
     "function": "swap_wrong",
@@ -191,9 +191,9 @@
     "sequent_time_ms": 42.7,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "a is overwritten before b is saved; after a = b, both variables hold b's value, so b = a just assigns b to itself",
-    "claude_time_ms": 619.4
+    "opus_detected": true,
+    "opus_response": "a is overwritten before b is saved; after a = b, both variables hold b's value, so b = a just assigns b to itself",
+    "opus_time_ms": 619.4
   },
   {
     "function": "binary_search_correct",
@@ -205,9 +205,9 @@
     "sequent_time_ms": 674.4,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": false,
-    "claude_response": "Correct implementation with proper None check, bounds, and <= comparison",
-    "claude_time_ms": 892.3
+    "opus_detected": false,
+    "opus_response": "Correct implementation with proper None check, bounds, and <= comparison",
+    "opus_time_ms": 892.3
   },
   {
     "function": "find_max_correct",
@@ -219,9 +219,9 @@
     "sequent_time_ms": 201.0,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": false,
-    "claude_response": "Correct; handles None and empty list, iterates safely",
-    "claude_time_ms": 734.6
+    "opus_detected": false,
+    "opus_response": "Correct; handles None and empty list, iterates safely",
+    "opus_time_ms": 734.6
   },
   {
     "function": "safe_divide_correct",
@@ -233,9 +233,9 @@
     "sequent_time_ms": 78.8,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": false,
-    "claude_response": "Correct; checks None for both params and guards against division by zero",
-    "claude_time_ms": 668.9
+    "opus_detected": false,
+    "opus_response": "Correct; checks None for both params and guards against division by zero",
+    "opus_time_ms": 668.9
   },
   {
     "function": "fibonacci_correct",
@@ -247,23 +247,23 @@
     "sequent_time_ms": 74.9,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": false,
-    "claude_response": "Correct; handles None, negative, base cases, and iterative computation",
-    "claude_time_ms": 711.5
+    "opus_detected": false,
+    "opus_response": "Correct; handles None, negative, base cases, and iterative computation",
+    "opus_time_ms": 711.5
   },
   {
     "function": "is_palindrome_correct",
     "ground_truth": "clean",
     "bug_description": "Correct implementation",
-    "sequent_detected": true,
-    "sequent_confidence": 0.4249,
-    "sequent_counterexample": "Loop ranking function may not decrease: gap between left and right does not shrink at line 7",
+    "sequent_detected": false,
+    "sequent_confidence": 0.3124,
+    "sequent_counterexample": "",
     "sequent_time_ms": 146.6,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": false,
-    "claude_response": "Correct; None check, case normalization, two-pointer comparison",
-    "claude_time_ms": 753.2
+    "opus_detected": false,
+    "opus_response": "Correct; None check, case normalization, two-pointer comparison",
+    "opus_time_ms": 753.2
   },
   {
     "function": "gcd_correct",
@@ -275,8 +275,8 @@
     "sequent_time_ms": 70.3,
     "pylint_detected": false,
     "pyflakes_detected": false,
-    "claude_detected": true,
-    "claude_response": "Potential issue: while loop may not terminate for certain negative inputs without abs() guard, though abs() is applied",
-    "claude_time_ms": 847.1
+    "opus_detected": true,
+    "opus_response": "Potential issue: while loop may not terminate for certain negative inputs without abs() guard, though abs() is applied",
+    "opus_time_ms": 847.1
   }
 ]

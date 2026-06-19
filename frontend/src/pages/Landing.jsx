@@ -2,17 +2,20 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState, useMemo } from 'react'
 
 const ASCII_LOGO = [
-  '  \u2554\u2550\u2557\u2554\u2550\u2557\u2554\u2550\u2557 \u2566 \u2566\u2554\u2550\u2557\u2554\u2557\u2554\u2554\u2566\u2557',
-  '  \u255A\u2550\u2557\u2551\u2563 \u2551\u2550\u256C\u2557\u2551 \u2551\u2551\u2563 \u2551\u2551\u2551 \u2551',
-  '  \u255A\u2550\u255D\u255A\u2550\u255D\u255A\u2550\u255D\u255A\u255A\u2550\u255D\u255A\u2550\u255D\u255D\u255A\u255D \u2569',
+  '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2588\u2557   \u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557',
+  '\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255D\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2551\u255A\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255D',
+  '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2554\u2588\u2588\u2557 \u2588\u2588\u2551   \u2588\u2588\u2551   ',
+  '\u255A\u2550\u2550\u2550\u2550\u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u255D  \u2588\u2588\u2551\u2584\u2584 \u2588\u2588\u2551\u2588\u2588\u2551   \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u255D  \u2588\u2588\u2551\u255A\u2588\u2588\u2557\u2588\u2588\u2551   \u2588\u2588\u2551   ',
+  '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u255A\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D\u255A\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557\u2588\u2588\u2551 \u255A\u2588\u2588\u2588\u2588\u2551   \u2588\u2588\u2551   ',
+  '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u255D\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u255D \u255A\u2550\u2550\u2580\u2580\u2550\u255D  \u255A\u2550\u2550\u2550\u2550\u2550\u255D \u255A\u2550\u2550\u2550\u2550\u2550\u2550\u255D\u255A\u2550\u255D  \u255A\u2550\u2550\u2550\u255D   \u255A\u2550\u255D   ',
 ]
 
 const TERMINAL_LINES = [
-  { type: 'cmd', text: '$ sequent verify auth.py' },
+  { type: 'cmd', text: '$ sequent check auth.py' },
   { type: 'blank' },
-  { type: 'pass', text: '  \u2713 verify login()          \u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7 PASS' },
-  { type: 'pass', text: '  \u2713 verify hash_password()  \u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7 PASS' },
-  { type: 'fail', text: '  \u2717 verify token_refresh()  \u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7 FAIL' },
+  { type: 'pass', text: '  \u2713 login()          \u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7 PASS' },
+  { type: 'pass', text: '  \u2713 hash_password()  \u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7 PASS' },
+  { type: 'fail', text: '  \u2717 token_refresh()  \u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7 FAIL' },
   { type: 'blank' },
   { type: 'muted', text: '    counterexample found:' },
   { type: 'muted', text: '      token_refresh(exp=0, iat=-1)' },
@@ -28,19 +31,19 @@ const TERMINAL_LINES = [
 const FEATURES = [
   {
     name: 'neurosymbolic verification',
-    desc: 'combines neural pattern recognition with symbolic proof engines. learns from your codebase, proves against formal specs.',
+    desc: 'a GATv2 graph neural net (10M params) reads your code property graph and proposes; a Z3 SMT solver formally disposes. both must agree before a verdict.',
   },
   {
     name: 'counterexample generation',
-    desc: "when verification fails, sequent doesn't just say \"wrong\" \u2014 it gives you the exact inputs that break your function.",
+    desc: "when verification fails, sequent doesn't just say \"wrong\" \u2014 Z3 returns the exact inputs that break your function.",
   },
   {
-    name: 'incremental analysis',
-    desc: 'only re-verifies functions that changed. watches your files. runs in <2s on most codebases.',
+    name: 'python + javascript / typescript',
+    desc: 'no DSLs, no annotations. write normal Python or JS/TS. sequent builds the graph (AST + control + data flow) and checks the same property classes across languages.',
   },
   {
-    name: 'python-native',
-    desc: 'no DSLs. no annotations. write normal python. sequent infers types, contracts, and invariants automatically.',
+    name: 'self-learning',
+    desc: 'every verification outcome is collected and fed back into training. sequent gets sharper the more you use it \u2014 10M params, fully offline, free forever.',
   },
 ]
 
@@ -54,60 +57,12 @@ const COLOR_MAP = {
   cyan: 'var(--accent-5)',
 }
 
-// Proof symbols that drift in the background
-const PROOF_SYMBOLS = [
-  '\u2200', '\u2203', '\u22A2', '\u22A8', '\u00AC', '\u2227', '\u2228', '\u2192',
-  '\u2194', '\u2261', '\u22A5', '\u22A4', '\u03BB', '\u0393', '\u22A6', '\u2208',
-  '\u2209', '\u2282', '\u2205',
-]
-
-function DriftingSymbols() {
-  const symbols = useRef(null)
-
-  if (!symbols.current) {
-    symbols.current = Array.from({ length: 50 }, (_, i) => ({
-      id: i,
-      char: PROOF_SYMBOLS[Math.floor(Math.random() * PROOF_SYMBOLS.length)],
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      size: 12 + Math.random() * 8,
-      duration: 60 + Math.random() * 60,
-      delay: Math.random() * -60,
-      opacity: 0.03 + Math.random() * 0.03,
-    }))
-  }
-
-  return (
-    <div className="drifting-symbols" aria-hidden="true">
-      {symbols.current.map(s => (
-        <span
-          key={s.id}
-          className="drift-symbol"
-          style={{
-            left: `${s.left}%`,
-            top: `${s.top}%`,
-            fontSize: `${s.size}px`,
-            animationDuration: `${s.duration}s`,
-            animationDelay: `${s.delay}s`,
-            opacity: s.opacity,
-          }}
-        >
-          {s.char}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// Line numbers in left margin
+// Subtle line-number gutter (decorative terminal touch)
 function LineNumbers() {
   const [count, setCount] = useState(80)
 
   useEffect(() => {
-    const update = () => {
-      const h = document.documentElement.scrollHeight
-      setCount(Math.ceil(h / 20))
-    }
+    const update = () => setCount(Math.ceil(document.documentElement.scrollHeight / 20))
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
@@ -116,7 +71,7 @@ function LineNumbers() {
   return (
     <div className="line-numbers" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i}>{i + 1}</div>
+        <div key={i}>{String(i + 1).padStart(2, '0')}</div>
       ))}
     </div>
   )
@@ -201,12 +156,12 @@ function TerminalDemo() {
   )
 }
 
-// Section divider component
+// Centered section heading (shared look with Docs)
 function SectionDivider({ label }) {
-  const dashes = '\u2500'.repeat(50)
   return (
-    <div className="section-divider">
-      {'\u2500\u2500'} {label} {dashes}
+    <div className="section-head">
+      <div className="section-head-title">{label}</div>
+      <div className="section-head-rule">{'\u2500'.repeat(40)}</div>
     </div>
   )
 }
@@ -263,7 +218,7 @@ function CodeExample() {
 // Quickstart block with copy button
 function QuickstartBlock() {
   const [copied, setCopied] = useState(false)
-  const commands = 'pip install sequent\ncd your-project\nsequent init\nsequent verify'
+  const commands = 'pip install sequent-verify\ncd your-project\nsequent check main.py\nsequent watch src/'
 
   return (
     <div className="quickstart-block">
@@ -277,10 +232,10 @@ function QuickstartBlock() {
       >
         {copied ? 'copied' : 'copy'}
       </button>
-      <div><span className="prompt">$ </span>pip install sequent</div>
+      <div><span className="prompt">$ </span>pip install sequent-verify</div>
       <div><span className="prompt">$ </span>cd your-project</div>
-      <div><span className="prompt">$ </span>sequent init</div>
-      <div><span className="prompt">$ </span>sequent verify</div>
+      <div><span className="prompt">$ </span>sequent check main.py</div>
+      <div><span className="prompt">$ </span>sequent watch src/</div>
       <div className="quickstart-end">that's it.</div>
     </div>
   )
@@ -395,7 +350,7 @@ function AttentionHeatmapDemo() {
   const maxScore = Math.max(...Object.values(DEMO_LINE_SCORES))
 
   return (
-    <div ref={ref} style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(12px)', transition: 'opacity 0.5s, transform 0.5s' }}>
+    <div ref={ref} style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 16px 48px -20px rgba(0, 0, 0, 0.7)', background: 'var(--bg-surface)', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(12px)', transition: 'opacity 0.5s, transform 0.5s' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
         <div>
@@ -557,7 +512,6 @@ export default function Landing() {
 
   return (
     <>
-      <DriftingSymbols />
       <LineNumbers />
       <StatusLine />
 
@@ -569,18 +523,18 @@ export default function Landing() {
           </pre>
           <p className="hero-subtitle">neural formal verification engine</p>
           <p className="hero-tagline">
-            neurosymbolic python debugger that proves
+            self-learning neurosymbolic verifier for python & js/ts
             <br />
-            your code correct — or finds the counterexample
+            that proves your code correct — or finds the counterexample
           </p>
 
           <div className="hero-install">
             <span className="prompt">$ </span>
-            <span>pip install sequent</span>
+            <span>pip install sequent-verify</span>
             <button
               className="copy-btn"
               onClick={() => {
-                navigator.clipboard?.writeText('pip install sequent')
+                navigator.clipboard?.writeText('pip install sequent-verify')
                 setCopied(true)
                 setTimeout(() => setCopied(false), 1500)
               }}
@@ -592,7 +546,7 @@ export default function Landing() {
 
           <div className="hero-actions">
             <a
-              href="https://github.com/devangpratapsingh/sequent"
+              href="https://github.com/devangpratap/sequent"
               target="_blank"
               rel="noopener noreferrer"
               className="btn"

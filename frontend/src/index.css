@@ -10,7 +10,7 @@
   --accent-1: #7aa2f7;
   --accent-2: #9ece6a;
   --accent-3: #f7768e;
-  --accent-4: #bb9af7;
+  --accent-4: #9d7cd8;
   --accent-5: #7dcfff;
 }
 
@@ -23,9 +23,15 @@
 body {
   background: var(--bg-deep);
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, 'SFMono-Regular', monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'calt' 1, 'liga' 1;
 }
 
 /* Static noise grain overlay */
@@ -42,52 +48,51 @@ body::after {
 }
 
 /* ======================================
-   DRIFTING PROOF SYMBOLS — BACKGROUND
+   DOT MATRIX — BACKGROUND
+   subtle orange dot grid that lights up
+   slightly around the cursor
    ====================================== */
 
-.drifting-symbols {
+.dot-matrix {
   position: fixed;
   inset: 0;
-  pointer-events: none;
   z-index: 0;
-  overflow: hidden;
+  pointer-events: none;
+  background-image: radial-gradient(circle at center, rgba(224, 138, 86, 0.10) 1px, transparent 1.4px);
+  background-size: 24px 24px;
 }
 
-.drift-symbol {
+.dot-matrix-glow {
   position: absolute;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-  animation: drift-up linear infinite;
-  will-change: transform;
-}
-
-@keyframes drift-up {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-100vh);
-  }
+  inset: 0;
+  background-image: radial-gradient(circle at center, rgba(240, 146, 80, 0.55) 1px, transparent 1.4px);
+  background-size: 24px 24px;
+  background-position: inherit;
+  opacity: var(--glow, 0);
+  transition: opacity 0.4s ease;
+  -webkit-mask-image: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 72%);
+  mask-image: radial-gradient(170px circle at var(--mx, 50%) var(--my, 50%), #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 72%);
 }
 
 /* ======================================
-   LINE NUMBERS — LEFT MARGIN
+   LINE NUMBERS — LEFT GUTTER
+   subtle terminal gutter, low profile
    ====================================== */
 
 .line-numbers {
   position: absolute;
-  top: 0;
-  left: 8px;
-  width: 36px;
-  font-size: 11px;
+  top: 1.25rem;
+  left: 10px;
+  width: 26px;
+  font-size: 10px;
   line-height: 20px;
   text-align: right;
   color: var(--text-muted);
-  opacity: 0.08;
+  opacity: 0.10;
   pointer-events: none;
-  z-index: 0;
-  font-family: 'JetBrains Mono', monospace;
   user-select: none;
+  z-index: 1;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* ======================================
@@ -126,12 +131,28 @@ body::after {
   margin-bottom: 5rem;
 }
 
-.section-divider {
+/* Shared centered section heading — used on Landing + Docs */
+.section-head {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.section-head-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  padding-left: 0.18em;
+  margin-bottom: 0.5rem;
+}
+
+.section-head-rule {
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: 1.5rem;
   white-space: nowrap;
   overflow: hidden;
+  opacity: 0.6;
 }
 
 /* ======================================
@@ -141,42 +162,51 @@ body::after {
 .hero {
   text-align: center;
   margin-bottom: 4rem;
-  padding-top: 2rem;
+  padding-top: 2.5rem;
 }
 
 .hero-ascii {
-  display: inline-block;
-  text-align: left;
-  font-size: 0.9rem;
-  line-height: 1.25;
-  margin-bottom: 0.75rem;
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: clamp(0.32rem, 1.6vw, 0.66rem);
+  line-height: 1.08;
+  letter-spacing: 0;
+  margin: 0 auto 1.5rem;
   font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  white-space: pre;
+  overflow: hidden;
   animation: logo-fade-in 0.8s ease-out;
 }
 
 .hero-logo-gradient {
-  background: linear-gradient(90deg, var(--accent-4), var(--accent-5));
+  background: linear-gradient(120deg, var(--accent-4) 0%, var(--accent-1) 50%, var(--accent-5) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(187, 154, 247, 0.22));
 }
 
 .hero-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
-  margin-bottom: 1.25rem;
-  letter-spacing: 0.08em;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  font-weight: 500;
+  padding-left: 0.34em;
 }
 
 .hero-tagline {
-  font-size: 0.825rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
-  margin-bottom: 1.5rem;
-  max-width: 28rem;
+  margin-bottom: 1.75rem;
+  max-width: 30rem;
   margin-left: auto;
   margin-right: auto;
-  line-height: 1.6;
-  opacity: 0.7;
+  line-height: 1.7;
+  opacity: 0.85;
 }
 
 .hero-install {
@@ -186,9 +216,10 @@ body::after {
   gap: 0.5rem;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  padding: 0.4rem 1.25rem;
-  margin-bottom: 1.25rem;
-  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 0.55rem 2.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.78rem;
   position: relative;
 }
 
@@ -197,11 +228,15 @@ body::after {
 }
 
 .hero-install .copy-btn {
-  margin-left: 1.5rem;
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 10px;
   color: var(--text-muted);
-  background: none;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
+  border-radius: 4px;
   padding: 2px 8px;
   cursor: pointer;
   font-family: inherit;
@@ -231,7 +266,12 @@ body::after {
    ====================================== */
 
 .btn {
-  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 9rem;
+  height: 2.25rem;
+  padding: 0 1rem;
   font-size: 0.75rem;
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -240,7 +280,7 @@ body::after {
   font-family: 'JetBrains Mono', monospace;
   text-decoration: none;
   transition: all 0.15s;
-  border-radius: 0;
+  border-radius: 6px;
 }
 
 .btn:hover {
@@ -270,31 +310,39 @@ body::after {
 .terminal-window {
   border: 1px solid var(--border);
   background: var(--bg-surface);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px -20px rgba(0, 0, 0, 0.7);
 }
 
 .terminal-titlebar {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 0.9rem;
   border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
 }
 
 .terminal-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 10px;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
 }
 
 .terminal-dots {
   display: flex;
-  gap: 6px;
+  gap: 7px;
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  opacity: 0.6;
+  opacity: 0.85;
 }
 
 .dot-red { background: var(--accent-3); }
@@ -302,9 +350,9 @@ body::after {
 .dot-green { background: var(--accent-2); }
 
 .terminal-body {
-  padding: 1rem;
-  font-size: 0.8rem;
-  line-height: 1.7;
+  padding: 1.15rem 1.35rem;
+  font-size: 0.78rem;
+  line-height: 1.75;
   min-height: 280px;
 }
 
@@ -372,6 +420,9 @@ body::after {
   align-items: stretch;
   gap: 0;
   border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px -20px rgba(0, 0, 0, 0.7);
 }
 
 .code-panel {
@@ -385,17 +436,18 @@ body::after {
 
 .code-panel-header {
   font-size: 10px;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.1rem;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
 }
 
 .code-panel-body {
   flex: 1;
-  padding: 1rem;
-  font-size: 0.75rem;
-  line-height: 1.7;
+  padding: 1.15rem 1.35rem;
+  font-size: 0.76rem;
+  line-height: 1.8;
   background: var(--bg-surface);
   margin: 0;
   white-space: pre;
@@ -437,10 +489,12 @@ body::after {
 .quickstart-block {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  padding: 1rem;
+  border-radius: 8px;
+  padding: 1.15rem 1.35rem;
   font-size: 0.825rem;
-  line-height: 1.8;
+  line-height: 1.85;
   position: relative;
+  box-shadow: 0 16px 48px -20px rgba(0, 0, 0, 0.7);
 }
 
 .quickstart-block .prompt {
@@ -577,12 +631,11 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   .terminal-line,
   .hero-ascii,
-  .cursor-blink::after,
-  .drift-symbol {
+  .cursor-blink::after {
     animation: none !important;
   }
-  .drifting-symbols {
-    display: none;
+  .dot-matrix-glow {
+    transition: none !important;
   }
 }
 
@@ -591,7 +644,7 @@ body::after {
    ====================================== */
 
 @media (max-width: 768px) {
-  .drifting-symbols {
+  .dot-matrix-glow {
     display: none;
   }
   .line-numbers {

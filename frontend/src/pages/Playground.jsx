@@ -119,7 +119,7 @@ export default function Playground() {
   }, [code])
 
   return (
-    <div style={{ maxWidth: '72rem', margin: '0 auto', padding: '2rem 1.5rem' }}>
+    <div style={{ maxWidth: '72rem', margin: '0 auto', padding: '2rem 1.5rem', position: 'relative', zIndex: 1 }}>
       {/* Examples */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>examples:</span>
@@ -131,8 +131,7 @@ export default function Playground() {
               fontSize: '0.75rem', padding: '0.3rem 0.75rem',
               border: '1px solid var(--border)', background: 'transparent',
               color: ex.color, cursor: 'pointer', fontFamily: 'inherit',
-              transition: 'border-color 0.15s',
-              textShadow: '0 0 5px rgba(196,101,58,0.3)',
+              transition: 'border-color 0.15s, color 0.15s',
             }}
           >
             [ {ex.label} ]
@@ -143,7 +142,7 @@ export default function Playground() {
       {/* Labels + verify row */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', textShadow: '0 0 5px rgba(196,101,58,0.3)' }}>input</span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 500 }}>input</span>
           <button
             onClick={analyze}
             disabled={loading}
@@ -153,19 +152,18 @@ export default function Playground() {
               color: loading ? 'var(--text-muted)' : 'var(--accent-4)',
               background: 'transparent', cursor: loading ? 'wait' : 'pointer',
               transition: 'all 0.15s',
-              textShadow: '0 0 5px rgba(196,101,58,0.3)',
             }}
           >
             {loading ? '[ analyzing... ]' : '[ verify ]'}
           </button>
         </div>
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', textShadow: '0 0 5px rgba(196,101,58,0.3)' }}>analysis</span>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 500, display: 'flex', alignItems: 'center' }}>analysis</span>
       </div>
 
       {/* Main Grid — both boxes start at the same line */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
         {/* Editor */}
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)', minHeight: '450px' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', background: 'var(--bg-surface)', minHeight: '450px' }}>
           <CodeMirror
             value={code}
             onChange={setCode}
@@ -177,7 +175,7 @@ export default function Playground() {
         </div>
 
         {/* Results */}
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)', minHeight: '450px', overflowY: 'auto', padding: '1.25rem' }}>
+        <div style={{ border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-surface)', minHeight: '450px', overflowY: 'auto', padding: '1.25rem' }}>
             {loading && <PipelineStages stage={stage} />}
 
             {error && (
@@ -392,7 +390,7 @@ function HeatmapPanel({ result, code }) {
   }, [activeEdges])
 
   return (
-    <div style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+    <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 16px 48px -20px rgba(0, 0, 0, 0.7)', background: 'var(--bg-surface)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
         <div>
